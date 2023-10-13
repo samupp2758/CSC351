@@ -74,6 +74,10 @@ class FileSystem {
         int my_increment_directories();
         int my_read_directories();
 
+        //Debugging
+        void print_inode_bitmap();
+        void print_block_bitmap();
+
 
 };
 

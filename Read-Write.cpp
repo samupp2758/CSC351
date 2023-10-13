@@ -132,14 +132,14 @@ void FileSystem::readFileOut(string FileName, int startingBlock, int numberOfBlo
 //Need to test
 int FileSystem::my_adjust_free_blocks(int amount) {
     char* buffer = readBlock(66);
-    cout << buffer[8] << " " << buffer[9] << " " << buffer[10] << " " << buffer[11] << endl;
+    //cout << buffer[8] << " " << buffer[9] << " " << buffer[10] << " " << buffer[11] << endl;
     int number = characters_To_Integer(&buffer[8]);
     number += amount;
     char* numberChars = integer_To_Characters(number);
     for (int i = 0; i < 4; i++) {
         buffer[8 + i] = numberChars[i];
     }
-    cout << buffer[8] << " " << buffer[9] << " " << buffer[10] << " " << buffer[11] << endl;
+    //cout << buffer[8] << " " << buffer[9] << " " << buffer[10] << " " << buffer[11] << endl;
     writeBlock(66, buffer);
     delete numberChars, buffer;
     return number;
@@ -225,7 +225,7 @@ int FileSystem::my_increment_directories() {
 
 //******************************************************************************
 //Need to test
-int FileSystem::my_decrement_directories() {
+int FileSystem::my_read_directories() {
     //Returns the number of directories in the group descriptor.
     char* buffer = readBlock(66);
     int number = characters_To_Integer(&buffer[16]);
@@ -436,24 +436,16 @@ int FileSystem::my_Read_Size(int inodeNumber) {
 //******************************************************************************
 
 void FileSystem::my_Set_ATime(int inodeNumber) {
-    cerr << "1";
     int* address = my_index_inodeTable(inodeNumber);
-    cerr << "2";
     int blockNumber = address[0];
-    cerr << "3";
     int offset = address[1];
-    cerr << "4";
     char* buffer = readBlock(blockNumber);
-    cerr << "5";
     int ATime = time(nullptr);
-    cerr << "6";
     char* cATime = integer_To_Characters(ATime);
-    cerr << "7";
     buffer[offset + 79] = cATime[0];
     buffer[offset + 80] = cATime[1];
     buffer[offset + 81] = cATime[2];
     buffer[offset + 82] = cATime[3];
-    cerr << "8";
     writeBlock(blockNumber, buffer);
     delete cATime, buffer, address;
 }
@@ -566,7 +558,7 @@ int* FileSystem::my_index_inodeTable(int inodeNumber) {
     temp[2] = buffer[offset + 6];
     temp[3] = buffer[offset + 7];
     result[1] = characters_To_Integer(temp);
-    cout << result[0] << " " << result[1] << endl;
+    //cout << result[0] << " " << result[1] << endl;
     delete buffer;
     return result;
 }
@@ -715,7 +707,7 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
             buffer[offset + i * 4] = cBlockNumber[0];
             buffer[offset + i * 4 + 1] = cBlockNumber[1];
             buffer[offset + i * 4 + 2] = cBlockNumber[2];
-            buffer[offset + i * 4 + 4] = cBlockNumber[3];
+            buffer[offset + i * 4 + 3] = cBlockNumber[3];
             writeBlock(location[0], buffer);
             found = true;
             delete cBlockNumber;
@@ -786,6 +778,8 @@ int FileSystem::create_inode(char* mode, int user, int group) {
         for (int j = 0; j < 8; j++) {
             if (!currentBits[j]) {
                 currentBits[j] = true;
+                buffer[i] = binary_To_Character(currentBits);
+                writeBlock(83, buffer);
                 inodeNumber = i * 8 + j;
                 my_decrement_free_inodes();
                 exit = true;
@@ -887,6 +881,7 @@ void FileSystem::Create_New_FS(string name) {
     bool mode2[] = {true, true, true, false, false, false, false, false};
     char mode[] = {binary_To_Character(mode1), binary_To_Character(mode2)};
     create_inode(mode, 0, 0);
+    my_increment_directories();
 
     delete numberOfinodes, numberOfBlocks, startOfFreeBlocks, blockBitmap,
      inodeBitmap, numberOfFreeBlocks, numberOfFreeinodes, numberOfDirectories;
@@ -950,6 +945,42 @@ int FileSystem::characters_To_Integer(char* chars) {
 
 //******************************************************************************
 
+void FileSystem::print_inode_bitmap() {
+    char* buffer = readBlock(83);
+    bool* bits;
+    
+    for (int i = 0; i < 256; i++) {
+        for (int j = 0; j < 16; j++) {
+            bits = character_To_Binary(buffer[i * 16 + j]);
+            for (int k = 0; k < 8; k++) {
+                cout << bits[k];
+            }
+            delete bits;
+        }
+        cout << endl;
+    }
+    delete buffer;
+}
+//******************************************************************************
+
+void FileSystem::print_block_bitmap() {
+    char* buffer;
+    bool* bits;
+    for (int i = 0; i < 16; i++) {
+        buffer = readBlock(67 + i);
+        for (int j = 0; j < 4096; j++) {
+            bits = character_To_Binary(buffer[i]);
+            for (int k = 0; k < 8; k++) {
+                cout << bits[k];
+            }
+            delete bits;
+        }
+        delete buffer;
+    }
+}
+
+//******************************************************************************
+
 int main() {
     FileSystem FS("disk.dat");
 
@@ -979,12 +1010,55 @@ int main() {
         buffer[i] = 'A';
     }
     
-    cout << FS.my_decrement_free_inodes() << endl;
-    cout << FS.my_decrement_free_inodes() << endl;
-    cout << FS.my_decrement_free_inodes() << endl;
-    cout << FS.my_read_free_inodes() << endl;
+    char* mode = FS.my_Read_Mode(0);
+    bool* mode1 = FS.character_To_Binary(mode[0]);
+    bool* mode2 = FS.character_To_Binary(mode[1]);
+    int UID = FS.my_Read_UID(0);
+    int GID = FS.my_Read_GID(0);
+    time_t ATime = (time_t)FS.my_Read_ATime(0);
+    time_t MTime = (time_t)FS.my_Read_MTime(0);
+    time_t CTime = (time_t)FS.my_Read_CTime(0);
 
-    
+    cout << "Mode: ";
+    for(int i = 0; i < 8; i++) {
+        cout << mode1[i] << " ";
+    }
+    for(int i = 0; i < 8; i++) {
+        cout << mode2[i] << " ";
+    }
+    cout << endl;
+    cout << "UID: " << UID << endl;
+    cout << "GID: " << GID << endl;
+    cout << "ATime: " << ctime(&ATime) << endl;
+    cout << "MTime: " << ctime(&MTime) << endl;
+    cout << "CTime: " << ctime(&CTime) << endl;
+
+    int* address = FS.my_index_inodeTable(0);
+    char* buffer2 = FS.readBlock(address[0]);
+    int blockNumber = FS.characters_To_Integer(&buffer2[address[1] + 19]);
+    int blockNumber2 = FS.characters_To_Integer(&buffer2[address[1] + 23]);
+    int blockNumber3 = FS.characters_To_Integer(&buffer2[address[1] + 27]);
+    int blockNumber4 = FS.characters_To_Integer(&buffer2[address[1] + 31]);
+    cout << "Address1: " << blockNumber << endl;
+    cout << "Address2: " << blockNumber2 << endl;
+    cout << "Address3: " << blockNumber3 << endl;
+    cout << "Address4: " << blockNumber4 << endl;
+
+    FS.writeBlock(66, buffer);
+    FS.writeBlock(83, buffer);
+
+
+    FS.print_block_bitmap();
+
+    /*
+    cout << "bits: ";
+    bool* bits = FS.character_To_Binary(128);
+    for (int i = 0; i < 8; i++) {
+        cout << bits[i];
+    }
+    cout << endl;
+    */
+
     //cout << FS.single_Allocate();
 
     /*
