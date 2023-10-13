@@ -883,6 +883,10 @@ void FileSystem::Create_New_FS(string name) {
 
     //Make the root directory
     //my_make_root();
+    bool mode1[] = {false, true, true, true, true, true, true, true};
+    bool mode2[] = {true, true, true, false, false, false, false, false};
+    char mode[] = {binary_To_Character(mode1), binary_To_Character(mode2)};
+    create_inode(mode, 0, 0);
 
     delete numberOfinodes, numberOfBlocks, startOfFreeBlocks, blockBitmap,
      inodeBitmap, numberOfFreeBlocks, numberOfFreeinodes, numberOfDirectories;
