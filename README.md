@@ -1,2 +1,2 @@
-# CSC356_FinalProject
-CSC356 Final Project
+# CSC351_FinalProject
+CSC351 Final Project
