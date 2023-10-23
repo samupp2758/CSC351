@@ -26,38 +26,38 @@ class FileSystem {
         FileSystem(string name);
         ~FileSystem();
 
+        bool my_Add_Address(int inodeNumber, int blockNumber);
+        bool my_Add_Address_DIndirect(char* block, int location, int blockNumber);
+        bool my_Add_Address_Indirect(char* block, int location, int blockNumber);
+        char* readBlock(int blockNumber);
+        int create_inode(char* mode, int user, int group);
+        int readFileIn(string FileName, int startingBlock);
+        int single_Allocate();
         void clearFS();
         void createDataFile(unsigned int size, string name);
-        char* readBlock(int blockNumber);
-        void writeBlock(int blockNumber, char* data);
-        int readFileIn(string FileName, int startingBlock);
-        void readFileOut(string FileName, int startingBlock, int numberOfBlocks);
         void Create_New_FS(string name);
-        int create_inode(char* mode, int user, int group);
-        int single_Allocate();
-        bool my_Add_Address(int inodeNumber, int blockNumber);
-        bool my_Add_Address_Indirect(char* block, int location, int blockNumber);
-        bool my_Add_Address_DIndirect(char* block, int location, int blockNumber);
-
+        void readFileOut(string FileName, int startingBlock, int numberOfBlocks);
+        void writeBlock(int blockNumber, char* data);       
+       
         //inode helper functions
-        void my_Set_Mode(int inodeNumber, char* mode);
         char* my_Read_Mode(int inodeNumber);
-        void my_Set_UID(int inodeNumber, int UID);
-        int my_Read_UID(int inodeNumber);
-        void my_Set_GID(int inodeNumber, int GID);
-        int my_Read_GID(int inodeNumber);
-        void my_Increment_nlinks(int inodeNumber);
-        void my_Decrement_nlinks(int inodeNumber);
-        int my_Read_nlinks(int inodeNumber);
-        void my_Set_Size(int inodeNumber, int size);
-        int my_Read_Size(int inodeNumber);
-        void my_Set_ATime(int inodeNumber);
-        int my_Read_ATime(int inodeNumber);
-        void my_Set_MTime(int inodeNumber);
-        int my_Read_MTime(int inodeNumber);
-        void my_Set_CTime(int inodeNumber);
-        int my_Read_CTime(int inodeNumber);
         int* my_index_inodeTable(int inodeNumber);
+        int my_Read_ATime(int inodeNumber);
+        int my_Read_CTime(int inodeNumber);
+        int my_Read_GID(int inodeNumber);
+        int my_Read_MTime(int inodeNumber);
+        int my_Read_nlinks(int inodeNumber);
+        int my_Read_Size(int inodeNumber);
+        int my_Read_UID(int inodeNumber);
+        void my_Decrement_nlinks(int inodeNumber);
+        void my_Increment_nlinks(int inodeNumber);
+        void my_Set_ATime(int inodeNumber);
+        void my_Set_CTime(int inodeNumber);
+        void my_Set_GID(int inodeNumber, int GID);
+        void my_Set_Mode(int inodeNumber, char* mode);
+        void my_Set_MTime(int inodeNumber);
+        void my_Set_Size(int inodeNumber, int size);
+        void my_Set_UID(int inodeNumber, int UID);
 
         //Utility & char conversion
         bool* character_To_Binary(char c);
@@ -77,7 +77,6 @@ class FileSystem {
         //Debugging
         void print_inode_bitmap();
         void print_block_bitmap();
-
 
 };
 
