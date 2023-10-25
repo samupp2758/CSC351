@@ -833,6 +833,86 @@ void FileSystem::print_block_bitmap() {
 }
 
 //******************************************************************************
+// Needs testing and debuging.
+char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
+	char* rc, temp;
+	rc = new char[nBytes];
+	int fileSize = my_Read_Size(inodeNumber);
+	if (position > fileSize || (position + nBytes) > fileSize) {
+		err("start of read position plus the length of read to be read is greater than the file's size");
+	}
+	int* fileBlocks = get_addresses(inodeNumber,0);
+	int blockNum = position / BLOCKSIZE; //which block in the file to start with
+	int startingPos = position % BLOCKSIZE; // should the position not be in the first block
+	int currentByte = 0;
+	if (blockNum < sizeof(fileBlocks)) {
+		temp = readBlock(fileBlocks[blockNum]);
+		for (int j = startingPos; j < BLOCKSIZE; j++) {
+			if (currentByte < nBytes) {
+				rc[currentByte] = temp[j];
+			} else {
+				break;
+			}
+			currentByte++;
+		}
+		if (currentByte < nBytes) { // more to be read
+			blockNum++;
+			for (; blockNum < sizeof(fileBlocks);blockNum++) {
+				if (currentByte < nBytes) {
+					temp = readBlock(fileBlocks[blockNum]);
+					for (int j = 0; j < BLOCKSIZE; j++) {
+						if (currentByte < nBytes) {
+							rc[currentByte] = temp[j];
+						} else {
+							break;
+						}
+						currentByte++;
+					}
+				} else {
+					break;
+				}
+			}
+		}
+	}
+	// if the file has more than sizeof(fileBlocks) blocks and still more to be read 
+	if (fileSize > (BLOCKSIZE *(sizeof(fileBlocks))) + 1 && (currentByte < nBytes)) {
+		delete fileBlocks;
+		blockNum = 0; // set to 0 to make fileBlocks[] easier 
+		int* fileBlocks = get_addresses(inodeNumber, 1);
+		
+		if (currentByte == 0) {
+			for (int j = startingPos; j < BLOCKSIZE; j++) {
+				if (currentByte < nBytes) {
+					rc[currentByte] = temp[j];
+				} else {
+					break;
+				}
+				currentByte++;
+			}
+			blockNum++;
+		}
+		
+		for (; blockNum < sizeof(fileBlocks);blockNum++) {
+			if (currentByte < nBytes) {
+				temp = readBlock(fileBlocks[blockNum]);
+				for (int j = 0; j < BLOCKSIZE; j++) {
+					if (currentByte < nBytes) {
+						rc[currentByte] = temp[j];
+					} else {
+						break;
+					}
+					currentByte++;
+				}
+			} else {
+				break;
+			}
+		}
+	}
+	
+	delete temp, fileBlocks;
+	return rc;
+}
+//******************************************************************************
 
 int main() {
     FileSystem FS("disk.dat");
