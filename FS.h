@@ -41,6 +41,8 @@ class FileSystem {
         int* get_addresses(int inodeNumber, int indirect_block);
         void my_write_dir(int directoryInodeNum, int entryInodeNum, string name);
         bool add_entry_to_block(int blockNumber, int entryInodeNum, string name);
+        char* my_Read(int inodeNumber, int position, int nBytes);
+
 
         //inode helper functions
         void my_Set_Mode(int inodeNumber, char* mode);
