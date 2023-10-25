@@ -833,13 +833,15 @@ void FileSystem::print_block_bitmap() {
 }
 
 //******************************************************************************
-// Needs testing and debuging.
+// Needs testing.
 char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
-	char* rc, temp;
+	char* rc;
+	char* temp;
 	rc = new char[nBytes];
 	int fileSize = my_Read_Size(inodeNumber);
 	if (position > fileSize || (position + nBytes) > fileSize) {
-		err("start of read position plus the length of read to be read is greater than the file's size");
+		cerr << "start of read position plus the length of read to be read is greater than the file's size";
+		abort();
 	}
 	int* fileBlocks = get_addresses(inodeNumber,0);
 	int blockNum = position / BLOCKSIZE; //which block in the file to start with
