@@ -35,15 +35,17 @@ class FileSystem {
         void Create_New_FS(string name);
         int create_inode(char* mode, int user, int group);
         int single_Allocate();
-        int allocate();
         bool my_Add_Address(int inodeNumber, int blockNumber);
         bool my_Add_Address_Indirect(char* block, int location, int blockNumber);
         bool my_Add_Address_DIndirect(char* block, int location, int blockNumber);
         int* get_addresses(int inodeNumber, int indirect_block);
         void my_write_dir(int directoryInodeNum, int entryInodeNum, string name);
         bool add_entry_to_block(int blockNumber, int entryInodeNum, string name);
-        char* my_Read(int inodeNumber, int position, int nBytes);
-
+        void my_extend(int inodeNumber);
+        int my_remove_entry(int directoryInodeNum, int position);
+        int my_read_dir(int directoryInodeNum, int position, int& inodeNumber, string& name, char& type);
+        //int my_mkdir_inode(int parentsInodeNum, int user, int group, string name);
+        //void my_rmdir_inode()
 
         //inode helper functions
         void my_Set_Mode(int inodeNumber, char* mode);
