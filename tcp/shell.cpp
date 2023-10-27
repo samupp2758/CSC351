@@ -14,16 +14,50 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <fstream>
+#include "json.hpp"
+#include "bits/stdc++.h"
+using json = nlohmann::json;
 using namespace std;
 //Shell side
+/*Function will be called in the main function every time a new message
+is received, and then returns the response to the client (return cstr).
+The decode (decode = parsed json) and handling of the encoded message
+ (encoded = stringfied json ) would be in here */
+char* format(string msg,string UID,string GID,string curDir){ 
+    string data = "";
+
+
+    if(strcmp( &msg[0], "exit")){
+        json response;
+        response["message"] = msg; 
+        response["UID"] = UID; 
+        response["GID"] = GID; 
+        response["curDir"] = curDir; 
+
+        data = response.dump();        
+    }else{
+        data = msg;
+    }
+
+    char *cstr = new char[data.length() + 1];
+    strcpy(cstr, data.c_str());
+
+    return cstr;
+}
+
 int main(int argc, char *argv[])
 {
+
+    
     
     string str = "127.0.0.1" ;
     char *serverIp = &str[0];
     int port = 230; 
-    //create a message buffer 
     char msg[4096]; 
+    string UID = "0";
+    string GID = "0";
+    string curDir = "/";
+
     //setup a socket and connection tools 
     struct hostent* host = gethostbyname(serverIp); 
     sockaddr_in sendSockAddr;   
@@ -44,10 +78,10 @@ int main(int argc, char *argv[])
 
     while(1){
         string data;
-        cout << "Request: ";
+        cout << curDir << " -> ";
         getline(cin, data);
         memset(&msg, 0, sizeof(msg));//clear the buffer
-        strcpy(msg, data.c_str());
+        strcpy(msg, format(data,UID,GID,curDir));
 
         if(data == "exit"){
             cout << "Closing..." << endl;
@@ -59,7 +93,8 @@ int main(int argc, char *argv[])
         memset(&msg, 0, sizeof(msg));//clear the buffer
         recv(clientSd, (char*)&msg, sizeof(msg), 0); //receives the response
         
-        cout << "Response: " << msg << endl;
+
+        cout << msg << endl;
     }
     close(clientSd);
     return 0;    

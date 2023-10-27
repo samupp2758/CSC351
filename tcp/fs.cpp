@@ -14,18 +14,22 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <fstream>
+#include "json.hpp"
+using json = nlohmann::json;
 using namespace std;
 //FS side
 /*Function will be called in the main function every time a new message
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
-char* format(char* msg){ 
+char* format(string msg){ 
     string data = "";
-    if(strcmp( msg, "exit")){
-        string pre_str = "{request:\"";
-        string pos_str = "\"}";
-        data = pre_str+msg+pos_str;        
+    if(strcmp( &msg[0], "exit")){
+        json j_complete = json::parse(msg);
+        data.append("Message: ");        
+        data.append(j_complete["message"]);        
+        data.append(" Current dir: ");        
+        data.append(j_complete["curDir"]);        
     }else{
         data = msg;
     }
@@ -36,8 +40,8 @@ char* format(char* msg){
     return cstr;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
+
     int port = 230;
     char msg[4096]; //message is 4096 bytes long
 
@@ -51,13 +55,12 @@ int main(int argc, char *argv[])
     //open stream oriented socket with internet address
     //also keep track of the socket descriptor
     int serverSd = socket(AF_INET, SOCK_STREAM, 0);
-    if(serverSd < 0)
-    {
+    if(serverSd < 0){
         cerr << "Error establishing the server socket" << endl;
         exit(0);
     }
 
-    int bindStatus = bind(serverSd, (struct sockaddr*) &servAddr, sizeof(servAddr));
+    int bindStatus = ::bind(serverSd, (struct sockaddr*) &servAddr, sizeof(servAddr));
 
     if(bindStatus < 0){
         cerr << "Error binding socket to local address" << endl;
@@ -76,12 +79,11 @@ int main(int argc, char *argv[])
     }
 
     cout << "Connected with the shell!" << endl;
-    while(1)
-    {
+    while(1){
         memset(&msg, 0, sizeof(msg));//clear the buffer
         recv(newSd, (char*)&msg, sizeof(msg), 0); //receives message
 
-        if(!strcmp(msg, "exit")) {
+        if(!strcmp(msg, "exit")){
             cout << "Shell has quit the session" << endl;
             send(newSd, (char*)&msg, strlen(msg), 0);
             break;
@@ -94,6 +96,7 @@ int main(int argc, char *argv[])
         //send the message to Shell
         send(newSd, (char*)&msg, strlen(msg), 0); //sends response
     }
+
     close(newSd);
     close(serverSd);
     return 0;   
