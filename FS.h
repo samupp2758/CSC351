@@ -44,8 +44,16 @@ class FileSystem {
         void my_extend(int inodeNumber);
         int my_remove_entry(int directoryInodeNum, int position);
         int my_read_dir(int directoryInodeNum, int position, int& inodeNumber, string& name, char& type);
-        //int my_mkdir_inode(int parentsInodeNum, int user, int group, string name);
-        //void my_rmdir_inode()
+        int my_readPath(string path);
+        int my_readPath(string path, int& parentInode);
+        int my_readPath(string path, int& parentInode, string& name);
+        int my_search_dir(int dirInode, string name, int& iNodeNum);
+        int my_search_dir(int dirInode, string name);
+        int my_mkdir(string path, int user, int group);
+        void my_rmdir(string path);
+        void my_Delete(int inodeNumber);
+        void mark_inode_free(int inodeNumber);
+        void mark_blocks_free(int* blockNumbers, int size);
 
         //inode helper functions
         void my_Set_Mode(int inodeNumber, char* mode);
@@ -76,6 +84,7 @@ class FileSystem {
         //Debugging
         void print_inode_bitmap();
         void print_block_bitmap();
+        void print_dir(string path);
 
 
 };
