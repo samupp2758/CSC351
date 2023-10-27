@@ -19,6 +19,26 @@
 using json = nlohmann::json;
 using namespace std;
 //Shell side
+
+char **line_splitter(char *line) {
+	int bufsize = 4096, position = 0;
+	char **tokens = malloc(bufsize);  //what holds our tokens
+	char *token = strtok(line, ' ');        //put tokenized values in tokens
+	while (token != NULL) {
+		tokens[position] = token;
+		position++;
+		
+		if(position >= bufsize) {	       //expand buffer if needed
+			bufsize += 4096;
+			tokens = realloc(tokens, bufsize);
+		}
+		
+		token = strtok(NULL, ' ');
+	}
+	tokens[position] = NULL;           //end of line is set to NULL
+	return tokens;
+}
+
 /*Function will be called in the main function every time a new message
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
