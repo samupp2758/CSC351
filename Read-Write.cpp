@@ -943,7 +943,7 @@ void FileSystem::my_write_dir(int directoryInodeNum, int entryInodeNum, string n
 }
 
 //******************************************************************************
-//Need to test
+//Somewhat tested
 int FileSystem::my_remove_entry(int directoryInodeNum, int position) {
     //Returns -1 if trying to remove an entry from an empty block
     //Byte 9 and bytes 4-7 are offsets from the current position/start of entry
@@ -1144,7 +1144,7 @@ int FileSystem::my_mkdir(string path, int user, int group) {
 }
 
 //******************************************************************************
-//Need to test
+//Somewhat tested
 void FileSystem::my_rmdir(string path) {
     //Maybe should return a boolean success fail
     string name;
@@ -1199,9 +1199,8 @@ int FileSystem::create_inode(char* mode, int user, int group) {
 
 //******************************************************************************
 
+//Somewhat tested
 void FileSystem::Create_New_FS(string name) {
-//needs testing
-
     //createDataFile(pow(2, 31), name);
     createDataFile(1024 * 1024 * 8, name);
     char* buffer;
@@ -1318,7 +1317,7 @@ void FileSystem::print_block_bitmap() {
 }
 
 //******************************************************************************
-//Needs testing
+//Somewhat tested
 void FileSystem::print_dir(string path) {
     int inode = -1;
     int position = 0;
