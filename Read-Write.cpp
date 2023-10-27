@@ -974,7 +974,7 @@ int FileSystem::my_remove_entry(int directoryInodeNum, int position) {
         //Removing the first entry from a block with other entries.
         //Overwrites the first entry with the entry immediately after it.
         int nextEntry = characters_To_Integer(&buffer[4]);
-        int nextEntrySize = (int)buffer[nextEntry + 9] + 10;
+        int nextEntrySize = (int)buffer[nextEntry + 9] + 10; //Have fiddled with this 10, but this seems right
         for (int i = 0; i < nextEntrySize; i++) {
             buffer[i] = buffer[i + nextEntry];
         }
