@@ -18,6 +18,7 @@
 using json = nlohmann::json;
 using namespace std;
 //FS side
+
 /*Function will be called in the main function every time a new message
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
@@ -55,6 +56,8 @@ char* execute(string msg){
     strcpy(cstr, res.c_str());
     return cstr;
 }
+
+//******************************************************************************
 
 int main(int argc, char *argv[]){
 

@@ -19,52 +19,10 @@
 using json = nlohmann::json;
 using namespace std;
 //Shell side
-char *request(json req_json,json user,int clientSd){
-    char req[4096];
-    req_json["user"] = user;
-    string req_ = req_json.dump();
-    memset(&req, 0, sizeof(req));//clear the buffer
-    strcpy(req, req_.c_str());
-    send(clientSd, (char*)&req, strlen(req), 0);
-    memset(&req, 0, sizeof(req));//clear the buffer
-    recv(clientSd, (char*)&req, sizeof(req), 0); 
-    return strcat(req,"");
-}
 
-void my_ls(char**input,json userInfo,int clientSd){
-    json requestForm = {
-        {"call","my_getPerm"},
-        {"path",(input[1] ? input[1] : "/")}
-    };
-    char* r = request(requestForm,userInfo,clientSd);
-    cout<<r<<endl;
-}
+//******************************************************************************
 
-void my_cd(char**input,json userInfo,int clientSd){
-    json requestForm = {
-        {"call","my_readPath"},
-        {"path",(input[1] ? input[1] : "/")}
-    };
-    char* r = request(requestForm,userInfo,clientSd);
-    cout<<r<<endl;
-}
-
-void my_mkdir(char**input,json userInfo,int clientSd){
-    json requestForm = {
-        {"call","my_mkdir"},
-        {"path",(input[1] ? input[1] : "/")}
-    };
-    char* r = request(requestForm,userInfo,clientSd);
-    cout<<r<<endl;
-}
-
-void my_Lcp(char**input,json userInfo,int clientSd){
-}
-
-
-void my_Icp(char**input,json userInfo,int clientSd){
-}
-
+/*Johnny*/
 char **line_splitter(char *line) {
 	int bufsize = 4096, position = 0;
 	char **tokens = (char**)malloc(bufsize);  //what holds our tokens
@@ -83,6 +41,65 @@ char **line_splitter(char *line) {
 	tokens[position] = NULL;           //end of line is set to NULL
 	return tokens;
 }
+
+//******************************************************************************
+
+char *request(json req_json,json user,int clientSd){
+    char req[4096];
+    req_json["user"] = user;
+    string req_ = req_json.dump();
+    memset(&req, 0, sizeof(req));//clear the buffer
+    strcpy(req, req_.c_str());
+    send(clientSd, (char*)&req, strlen(req), 0);
+    memset(&req, 0, sizeof(req));//clear the buffer
+    recv(clientSd, (char*)&req, sizeof(req), 0); 
+    return strcat(req,"");
+}
+
+//******************************************************************************
+
+void my_ls(char**input,json userInfo,int clientSd){
+    json requestForm = {
+        {"call","my_getPerm"},
+        {"path",(input[1] ? input[1] : "/")}
+    };
+    char* r = request(requestForm,userInfo,clientSd);
+    cout<<r<<endl;
+}
+
+//******************************************************************************
+
+void my_cd(char**input,json userInfo,int clientSd){
+    json requestForm = {
+        {"call","my_readPath"},
+        {"path",(input[1] ? input[1] : "/")}
+    };
+    char* r = request(requestForm,userInfo,clientSd);
+    cout<<r<<endl;
+}
+
+//******************************************************************************
+
+void my_mkdir(char**input,json userInfo,int clientSd){
+    json requestForm = {
+        {"call","my_mkdir"},
+        {"path",(input[1] ? input[1] : "/")}
+    };
+    char* r = request(requestForm,userInfo,clientSd);
+    cout<<r<<endl;
+}
+
+//******************************************************************************
+
+void my_Lcp(char**input,json userInfo,int clientSd){
+}
+
+//******************************************************************************
+
+void my_Icp(char**input,json userInfo,int clientSd){
+}
+
+//******************************************************************************
 
 /*Function will be called in the main function every time a new message
 is received, and then returns the response to the client (return cstr).
@@ -110,6 +127,8 @@ void execute(string msg,json user,int clientSd){
         data = msg;
     }
 }
+
+//******************************************************************************
 
 int main(int argc, char *argv[])
 {
