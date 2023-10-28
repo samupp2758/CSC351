@@ -22,21 +22,37 @@ using namespace std;
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
-char* format(string msg){ 
-    string data = "";
-    if(strcmp( &msg[0], "exit")){
-        json j_complete = json::parse(msg);
-        data.append("Message: ");        
-        data.append(j_complete["message"]);        
-        data.append(" Current dir: ");        
-        data.append(j_complete["curDir"]);        
-    }else{
-        data = msg;
-    }
+char* execute(string msg){
+    json response;
+    string res = "";
+        if(strcmp( &msg[0], "exit")){
+            json j = json::parse(msg);
+            response["message"] = j["call"];
 
-    char *cstr = new char[data.length() + 1];
-    strcpy(cstr, data.c_str());
-
+            if(j["call"] == "my_getPerm"){
+            }else if(j["call"] == "my_readPath"){
+                response["inode"] = 12907088;
+            }else if(j["call"] == "my_Read_Size"){
+            }else if(j["call"] == "my_read_dir"){
+            }else if(j["call"] == "my_Read_Mode"){
+            }else if(j["call"] == "my_Read_nlinks"){
+            }else if(j["call"] == "my_Read_UID"){
+            }else if(j["call"] == "my_Read_GID"){
+            }else if(j["call"] == "my_Read_MTime"){
+            }else if(j["call"] == "my_read"){
+            }else if(j["call"] == "my_mkdir"){
+            }else{
+                string data = "";
+                data.append(j["call"]);
+                data.append(": call not found!");
+                response = {{"error",true},{"message",data}};
+            }    
+            res = response.dump();
+        }else{
+            res = msg;
+        }
+    char *cstr = new char[res.length() + 1];
+    strcpy(cstr, res.c_str());
     return cstr;
 }
 
@@ -80,21 +96,24 @@ int main(int argc, char *argv[]){
 
     cout << "Connected with the shell!" << endl;
     while(1){
+        
         memset(&msg, 0, sizeof(msg));//clear the buffer
         recv(newSd, (char*)&msg, sizeof(msg), 0); //receives message
-
+        
         if(!strcmp(msg, "exit")){
             cout << "Shell has quit the session" << endl;
             send(newSd, (char*)&msg, strlen(msg), 0);
             break;
         }
 
-        cout << "Request: " << msg << endl; //debugging print!
-        strcpy(msg, format(msg)); //message handler
-        cout << "Response: " << msg << endl; //debugging print!
+        if(strlen(msg) != 0){
+            cout << "Request:" << msg << endl;
+            strcpy(msg, execute(msg)); //message handler
+            cout << "Response:" << msg << endl;
+            send(newSd, (char*)&msg, strlen(msg), 0); //sends response
+        }
 
-        //send the message to Shell
-        send(newSd, (char*)&msg, strlen(msg), 0); //sends response
+    
     }
 
     close(newSd);

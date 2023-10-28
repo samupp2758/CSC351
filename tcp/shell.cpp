@@ -19,21 +19,66 @@
 using json = nlohmann::json;
 using namespace std;
 //Shell side
+char *request(json req_json,json user,int clientSd){
+    char req[4096];
+    req_json["user"] = user;
+    string req_ = req_json.dump();
+    memset(&req, 0, sizeof(req));//clear the buffer
+    strcpy(req, req_.c_str());
+    send(clientSd, (char*)&req, strlen(req), 0);
+    memset(&req, 0, sizeof(req));//clear the buffer
+    recv(clientSd, (char*)&req, sizeof(req), 0); 
+    return strcat(req,"");
+}
+
+void my_ls(char**input,json userInfo,int clientSd){
+    json requestForm = {
+        {"call","my_getPerm"},
+        {"path",(input[1] ? input[1] : "/")}
+    };
+    char* r = request(requestForm,userInfo,clientSd);
+    cout<<r<<endl;
+}
+
+void my_cd(char**input,json userInfo,int clientSd){
+    json requestForm = {
+        {"call","my_readPath"},
+        {"path",(input[1] ? input[1] : "/")}
+    };
+    char* r = request(requestForm,userInfo,clientSd);
+    cout<<r<<endl;
+}
+
+void my_mkdir(char**input,json userInfo,int clientSd){
+    json requestForm = {
+        {"call","my_mkdir"},
+        {"path",(input[1] ? input[1] : "/")}
+    };
+    char* r = request(requestForm,userInfo,clientSd);
+    cout<<r<<endl;
+}
+
+void my_Lcp(char**input,json userInfo,int clientSd){
+}
+
+
+void my_Icp(char**input,json userInfo,int clientSd){
+}
 
 char **line_splitter(char *line) {
 	int bufsize = 4096, position = 0;
-	char **tokens = malloc(bufsize);  //what holds our tokens
-	char *token = strtok(line, ' ');        //put tokenized values in tokens
+	char **tokens = (char**)malloc(bufsize);  //what holds our tokens
+	char *token = strtok(line, " ");        //put tokenized values in tokens
 	while (token != NULL) {
 		tokens[position] = token;
 		position++;
 		
 		if(position >= bufsize) {	       //expand buffer if needed
 			bufsize += 4096;
-			tokens = realloc(tokens, bufsize);
+			tokens = (char**)realloc(tokens, bufsize);
 		}
 		
-		token = strtok(NULL, ' ');
+		token = strtok(NULL, " ");
 	}
 	tokens[position] = NULL;           //end of line is set to NULL
 	return tokens;
@@ -43,40 +88,35 @@ char **line_splitter(char *line) {
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
-char* format(string msg,string UID,string GID,string curDir){ 
+void execute(string msg,json user,int clientSd){ 
     string data = "";
-
+    char** ss = line_splitter(&msg[0]);
 
     if(strcmp( &msg[0], "exit")){
-        json response;
-        response["message"] = msg; 
-        response["UID"] = UID; 
-        response["GID"] = GID; 
-        response["curDir"] = curDir; 
 
-        data = response.dump();        
+        if(!strcmp( ss[0], "ls")) my_ls(ss,user,clientSd);
+        else if(!strcmp( ss[0], "cd")) my_cd(ss,user,clientSd);
+        else if(!strcmp( ss[0], "mkdir")) my_mkdir(ss,user,clientSd);
+        else if(!strcmp( ss[0], "Lcp")) my_Lcp(ss,user,clientSd);
+        else if(!strcmp( ss[0], "Icp")) my_Icp(ss,user,clientSd);
+        else{
+            string d = "shell: command not found: ";
+            d.append(ss[0]);
+            cout << d << endl;
+            data.append("error");
+        }     
+
     }else{
         data = msg;
     }
-
-    char *cstr = new char[data.length() + 1];
-    strcpy(cstr, data.c_str());
-
-    return cstr;
 }
 
 int main(int argc, char *argv[])
 {
-
-    
-    
     string str = "127.0.0.1" ;
     char *serverIp = &str[0];
     int port = 230; 
     char msg[4096]; 
-    string UID = "0";
-    string GID = "0";
-    string curDir = "/";
 
     //setup a socket and connection tools 
     struct hostent* host = gethostbyname(serverIp); 
@@ -95,26 +135,24 @@ int main(int argc, char *argv[])
     }
     cout << "Connected to the FS!" << endl;
 
+    string curDir = "/";
+    json user = {{"UID",0},{"GID",0},{"curDir",curDir}};
 
     while(1){
         string data;
         cout << curDir << " -> ";
         getline(cin, data);
         memset(&msg, 0, sizeof(msg));//clear the buffer
-        strcpy(msg, format(data,UID,GID,curDir));
+
+        execute(data,user,clientSd);
 
         if(data == "exit"){
+            strcpy(msg, "exit");
             cout << "Closing..." << endl;
             send(clientSd, (char*)&msg, strlen(msg), 0);
             break;
         }
 
-        send(clientSd, (char*)&msg, strlen(msg), 0); //sends the msg
-        memset(&msg, 0, sizeof(msg));//clear the buffer
-        recv(clientSd, (char*)&msg, sizeof(msg), 0); //receives the response
-        
-
-        cout << msg << endl;
     }
     close(clientSd);
     return 0;    
