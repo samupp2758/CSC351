@@ -548,6 +548,83 @@ int FileSystem::single_Allocate() {
 }
 
 //******************************************************************************
+
+int FileSystem::allocate() {
+    //Returns the beginning number of 8 consecutive free blocks. 0 means no blocks were free.
+    char* buffer;
+    int blockNumber = 0;
+    int bitmap = 1;
+    int emptyBitCounter = 0;
+    int startingBlockTracker = 0;
+    bool* currentBits;
+    bool exit = false;
+    while (!blockNumber && bitmap <= 17) {
+        buffer = readBlock(bitmap);
+        for (int i = 0; i < 4096; i++) {
+            currentBits = character_To_Binary(buffer[i]);
+            //cout << "char: " << (int)buffer[i] << endl;
+            for (int j = 0; j < 8; j++) {
+                if(currentBits[j] == 1){
+                    emptyBitCounter = 0;
+                }
+                //cout << j << endl;
+                if(currentBits[j] == 0){
+                    if(emptyBitCounter == 0){
+                        startingBlockTracker = j;
+                    }
+                    //count consecutive free bits
+                    emptyBitCounter++;
+                }
+                if(emptyBitCounter == 8 && startingBlockTracker == 0){
+                    //8 free consecutive blocks were found AND its all in the same currentBits
+                    //flip the bits in the bitmap
+                    for(int x = 0; x < 8; x++){
+                        currentBits[x] = true;
+                    }
+                    exit = true;
+                    //beginning block number
+                    blockNumber = (bitmap - 1) * 32768 + i * 8;
+                    buffer[i] = binary_To_Character(currentBits);
+                    writeBlock(bitmap, buffer);
+                    break;
+                } else if(emptyBitCounter == 8){
+                    //8 consecutive free bits were found but spans multiple currentBit variables
+                    //get the currentBit pieces from the previous currentBits (which is where the consecutive 8 started) flipped
+                    currentBits = character_To_Binary(buffer[i-1]);
+                    for(int x = startingBlockTracker; x < 8; x++){
+                        currentBits[x] = true;
+                    }
+                    //rewrite those to the buffer
+                    buffer[i-1] = binary_To_Character(currentBits);
+                    //write out the block
+                    writeBlock(bitmap, buffer);
+                    //get the remaining amount left in the current currentBits flipped
+                    currentBits = character_To_Binary(buffer[i]);
+                    for(int x = 0; x < 8-startingBlockTracker; x++){
+                        currentBits[x] = true;
+                    }
+                    //put it in the buffer
+                    buffer[i] = binary_To_Character(currentBits);
+                    //write out the buffer
+                    writeBlock(bitmap, buffer);
+                    //get the starting number of block
+                    blockNumber = (bitmap - 1) * 32768 + (i-1) * 8 + startingBlockTracker;
+                    exit = true;
+                    break;
+                }
+            }
+            delete currentBits;
+            if (exit) {
+                break;
+            }
+        }
+        delete buffer;
+        bitmap++;
+    }
+    return blockNumber;
+}
+
+//******************************************************************************
 //Need to test
 bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNumber) {
     //Takes in a block and an offset within that block. It then treates that
