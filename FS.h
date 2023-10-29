@@ -35,6 +35,7 @@ class FileSystem {
         void Create_New_FS(string name);
         int create_inode(char* mode, int user, int group);
         int single_Allocate();
+        int allocate();
         bool my_Add_Address(int inodeNumber, int blockNumber);
         bool my_Add_Address_Indirect(char* block, int location, int blockNumber);
         bool my_Add_Address_DIndirect(char* block, int location, int blockNumber);
