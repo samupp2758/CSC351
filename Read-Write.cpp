@@ -625,6 +625,21 @@ int FileSystem::allocate() {
 }
 
 //******************************************************************************
+
+bool FileSystem::my_extend(int inodeNumber) {
+    int startingBlock = 0;
+    bool rc = false;
+    startingBlock = allocate();
+    if(startingBlock != 0) {
+        for(int x = startingBlock; x < (startingBlock + 8); x++) {
+            my_Add_Address(inodeNumber, x);
+        }
+        rc = true;
+    }
+    return rc;
+}
+
+//******************************************************************************
 //Need to test
 bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNumber) {
     //Takes in a block and an offset within that block. It then treates that
