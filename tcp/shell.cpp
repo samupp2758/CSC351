@@ -66,10 +66,10 @@ void my_ls(char**input,json userInfo,int clientSd){
     json callResponses = {{}};
     json requestForms = {{
         {"call","my_getPerm"},
-        {"path",(input[1] ? input[1] : "/")}
+        {"path",(input[1] ? input[1] : userInfo["curDir"])}
     },{
         {"call","my_readPath"},
-        {"path",(input[1] ? input[1] : "/")}
+        {"path",(input[1] ? input[1] : userInfo["curDir"])}
     },{
         {"call","my_Read_Size"},
         {"inode",{}}
@@ -127,7 +127,7 @@ void execute(string msg,json user,int clientSd){
     char** ss = line_splitter(&msg[0]);
 
     
-        if(strcmp( &msg[0], "exit")) data = msg;
+        if(strcmp( ss[0], "exit")) data = msg;
         else if(!strcmp( ss[0], "ls")) my_ls(ss,user,clientSd);
         else if(!strcmp( ss[0], "cd")) my_cd(ss,user,clientSd);
         else if(!strcmp( ss[0], "mkdir")) my_mkdir(ss,user,clientSd);
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
         cout << curDir << " -> ";
         getline(cin, data);
         memset(&msg, 0, sizeof(msg));//clear the buffer
-
+        
         //TODO exit
         if(data == "shutdown"){
             strcpy(msg, data.c_str());
