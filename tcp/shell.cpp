@@ -59,12 +59,29 @@ char *request(json req_json,json user,int clientSd){
 //******************************************************************************
 
 void my_ls(char**input,json userInfo,int clientSd){
-    json requestForm = {
+    char* r;
+    json r_j;
+    json p_r;
+    bool error = false;
+    json callResponses = {{}};
+    json requestForms = {{
         {"call","my_getPerm"},
         {"path",(input[1] ? input[1] : "/")}
-    };
-    char* r = request(requestForm,userInfo,clientSd);
-    cout<<r<<endl;
+    },{
+        {"call","my_readPath"},
+        {"path",(input[1] ? input[1] : "/")}
+    },{
+        {"call","my_Read_Size"},
+        {"inode",{}}
+    }};
+
+
+    for(int i = 0;i<requestForms.size();i++){
+        r = request(requestForms[i],userInfo,clientSd);
+        cout<<r<<endl;
+
+    }
+    
 }
 
 //******************************************************************************
@@ -109,9 +126,9 @@ void execute(string msg,json user,int clientSd){
     string data = "";
     char** ss = line_splitter(&msg[0]);
 
-    if(strcmp( &msg[0], "exit")){
-
-        if(!strcmp( ss[0], "ls")) my_ls(ss,user,clientSd);
+    
+        if(strcmp( &msg[0], "exit")) data = msg;
+        else if(!strcmp( ss[0], "ls")) my_ls(ss,user,clientSd);
         else if(!strcmp( ss[0], "cd")) my_cd(ss,user,clientSd);
         else if(!strcmp( ss[0], "mkdir")) my_mkdir(ss,user,clientSd);
         else if(!strcmp( ss[0], "Lcp")) my_Lcp(ss,user,clientSd);
@@ -121,11 +138,8 @@ void execute(string msg,json user,int clientSd){
             d.append(ss[0]);
             cout << d << endl;
             data.append("error");
-        }     
+        } 
 
-    }else{
-        data = msg;
-    }
 }
 
 //******************************************************************************
@@ -163,14 +177,15 @@ int main(int argc, char *argv[])
         getline(cin, data);
         memset(&msg, 0, sizeof(msg));//clear the buffer
 
-        execute(data,user,clientSd);
-
-        if(data == "exit"){
-            strcpy(msg, "exit");
+        //TODO exit
+        if(data == "shutdown"){
+            strcpy(msg, data.c_str());
             cout << "Closing..." << endl;
             send(clientSd, (char*)&msg, strlen(msg), 0);
             break;
         }
+
+        execute(data,user,clientSd);
 
     }
     close(clientSd);

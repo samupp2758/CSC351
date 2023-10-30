@@ -31,10 +31,14 @@ char* execute(string msg){
             response["message"] = j["call"];
 
             if(j["call"] == "my_getPerm"){
+                response["message"] = "cool beans";
             }else if(j["call"] == "my_readPath"){
-                response["inode"] = 12907088;
+                response["inode"] = 1283198237;
             }else if(j["call"] == "my_Read_Size"){
+                response["message"] = 10;
             }else if(j["call"] == "my_read_dir"){
+                response["type"] = "cooltype";
+                response["name"] = "name";
             }else if(j["call"] == "my_Read_Mode"){
             }else if(j["call"] == "my_Read_nlinks"){
             }else if(j["call"] == "my_Read_UID"){
@@ -102,9 +106,10 @@ int main(int argc, char *argv[]){
         
         memset(&msg, 0, sizeof(msg));//clear the buffer
         recv(newSd, (char*)&msg, sizeof(msg), 0); //receives message
-        
-        if(!strcmp(msg, "exit")){
-            cout << "Shell has quit the session" << endl;
+    
+
+        if(!strcmp(msg, "shutdown")){
+            cout << "Closing..." << endl;
             send(newSd, (char*)&msg, strlen(msg), 0);
             break;
         }
