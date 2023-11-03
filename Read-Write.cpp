@@ -513,6 +513,7 @@ void FileSystem::my_Delete(int inodeNumber) {
 
 //******************************************************************************
 
+//Returns the number of a free block. 0 means no blocks were free.
 int FileSystem::single_Allocate() {
     //Returns the number of a free block. 0 means no blocks were free.
     char* buffer;
@@ -627,21 +628,30 @@ int FileSystem::allocate() {
 //******************************************************************************
 
 bool FileSystem::my_extend(int inodeNumber) {
+    //Extends the file by 8 blocks. If the i-node ran out of room, it adds as many
+    // as many of the allocated entries as possible. The remaining allocated blocks
+    // are marked as free.
     int startingBlock = 0;
     bool rc = false;
+    bool successfulAdd;
     startingBlock = allocate();
     if(startingBlock != 0) {
         for(int x = startingBlock; x < (startingBlock + 8); x++) {
-            my_Add_Address(inodeNumber, x);
+            successfulAdd = my_Add_Address(inodeNumber, x);
+            if (!successfulAdd) {
+                mark_blocks_free(&x, 1);
+            }
         }
         rc = true;
     }
     return rc;
+
 }
 
 //******************************************************************************
 //Need to test
-bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNumber) {
+//Returns T/F for success
+bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNumber, bool full) {
     //Takes in a block and an offset within that block. It then treates that
     // position as an indirect block and tries to add the given address to it.
     int indirectBlock;
@@ -650,17 +660,21 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
     if (!block[location] && !block[location + 1] && !block[location + 2] && !block[location + 3]) {
         //If it doesn't, then create it.
         indirectBlock = single_Allocate();
-        char* buffer = readBlock(indirectBlock);
-        for (int i = 0; i < 4096; i++) {
-            buffer[i] = 0;
+        if (indirectBlock != 0) {
+            char* buffer = readBlock(indirectBlock);
+            for (int i = 0; i < 4096; i++) {
+                buffer[i] = 0;
+            }
+            writeBlock(indirectBlock, buffer);
+            char* cIndirectBlock = integer_To_Characters(indirectBlock);
+            block[location] = cIndirectBlock[0];
+            block[location + 1] = cIndirectBlock[1];
+            block[location + 2] = cIndirectBlock[2];
+            block[location + 3] = cIndirectBlock[3];
+            delete cIndirectBlock, buffer;
+        } else {
+            full = true;
         }
-        writeBlock(indirectBlock, buffer);
-        char* cIndirectBlock = integer_To_Characters(indirectBlock);
-        block[location] = cIndirectBlock[0];
-        block[location + 1] = cIndirectBlock[1];
-        block[location + 2] = cIndirectBlock[2];
-        block[location + 3] = cIndirectBlock[3];
-        delete cIndirectBlock, buffer;
     } else { //It does exist
         char cIndirectBlock[4];
         cIndirectBlock[0] = block[location];
@@ -669,42 +683,48 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
         cIndirectBlock[3] = block[location + 3];
         indirectBlock = characters_To_Integer(cIndirectBlock);
     }
-    char* buffer = readBlock(indirectBlock);
-    for (int i = 0; i < 4096; i += 4) {
-        //Check if an address in null, and thus not in use.
-        if (!buffer[i] && !buffer[i + 1] && !buffer[i + 2] && !buffer[i + 3]) {
-            char* cBlockNumber = integer_To_Characters(blockNumber);
-            buffer[i] = cBlockNumber[0];
-            buffer[i + 1] = cBlockNumber[1];
-            buffer[i + 2] = cBlockNumber[2];
-            buffer[i + 3] = cBlockNumber[3];
-            writeBlock(indirectBlock, buffer);
-            success = true;
-            break;
+    if (!full) {
+        char* buffer = readBlock(indirectBlock);
+        for (int i = 0; i < 4096; i += 4) {
+            //Check if an address in null, and thus not in use.
+            if (!buffer[i] && !buffer[i + 1] && !buffer[i + 2] && !buffer[i + 3]) {
+                char* cBlockNumber = integer_To_Characters(blockNumber);
+                buffer[i] = cBlockNumber[0];
+                buffer[i + 1] = cBlockNumber[1];
+                buffer[i + 2] = cBlockNumber[2];
+                buffer[i + 3] = cBlockNumber[3];
+                writeBlock(indirectBlock, buffer);
+                success = true;
+                break;
+            }
         }
+        delete buffer;
     }
-    delete buffer;
     return success;
 }
 
 //******************************************************************************
 
-bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNumber) {
+bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNumber, bool full) {
     bool success = false;
     int DIndirect;
     if (!block[location] && !block[location + 1] && !block[location + 2] && !block[location + 3]) {
         DIndirect = single_Allocate();
-        char* buffer = readBlock(DIndirect);
-        for (int i = 0; i < 4096; i++) {
-            buffer[i] = 0;
+        if (DIndirect != 0) {
+            char* buffer = readBlock(DIndirect);
+            for (int i = 0; i < 4096; i++) {
+                buffer[i] = 0;
+            }
+            writeBlock(DIndirect, buffer);
+            char* cDIndirect = integer_To_Characters(DIndirect);
+            block[location] = cDIndirect[0];
+            block[location + 1] = cDIndirect[1];
+            block[location + 2] = cDIndirect[2];
+            block[location + 3] = cDIndirect[3];
+            delete buffer, cDIndirect;
+        } else {
+            full = true;
         }
-        writeBlock(DIndirect, buffer);
-        char* cDIndirect = integer_To_Characters(DIndirect);
-        block[location] = cDIndirect[0];
-        block[location + 1] = cDIndirect[1];
-        block[location + 2] = cDIndirect[2];
-        block[location + 3] = cDIndirect[3];
-        delete buffer, cDIndirect;
     } else {
         char cDIndirect[4];
         cDIndirect[0] = block[location];
@@ -713,15 +733,20 @@ bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNu
         cDIndirect[3] = block[location + 3];
         DIndirect = characters_To_Integer(cDIndirect);
     }
-    char* buffer = readBlock(DIndirect);
-    for (int i = 0; i < 4096; i += 4) {
-        success = my_Add_Address_Indirect(buffer, i, blockNumber);
-        if (success) {
-            writeBlock(DIndirect, buffer);
-            break;
+    if (!full) {
+        char* buffer = readBlock(DIndirect);
+        for (int i = 0; i < 4096; i += 4) {
+            success = my_Add_Address_Indirect(buffer, i, blockNumber, full);
+            if (full) {
+                break;
+            }
+            if (success) {
+                writeBlock(DIndirect, buffer);
+                break;
+            }
         }
+        delete buffer;
     }
-    delete buffer;
     return success;
 }
 
@@ -732,6 +757,7 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
     char* buffer = readBlock(location[0]);
     int offset = location[1] + 19; //Offset of the addresses
     bool found = false;
+    bool full = false;
 
     char cAddress[4];
     int address;
@@ -757,30 +783,34 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
 
     //Search the first indirect block
     if (!found) {
-        found = my_Add_Address_Indirect(buffer, location[1] + 67, blockNumber);
+        found = my_Add_Address_Indirect(buffer, location[1] + 67, blockNumber, full);
     }
     //Search the double indirect block
-    if (!found) {
-        found = my_Add_Address_DIndirect(buffer, location[1] + 71, blockNumber);
+    if (!found && !full) {
+        found = my_Add_Address_DIndirect(buffer, location[1] + 71, blockNumber, full);
     }
     //Seaerch the triple indirect block
-    if (!found) {
+    if (!found && !full) {
         int TIndirect;
         int TOffset = location[1] + 75;
         if (!buffer[TOffset] && !buffer[TOffset + 1] && !buffer[TOffset + 2] && !buffer[TOffset + 3]) {
             TIndirect = single_Allocate();
-            char* buffer2 = readBlock(TIndirect);
-            for (int i = 0; i < 4096; i++) {
-                buffer2[i] = 0;
-            }
-            writeBlock(TIndirect, buffer2);
-            char* cTDirect = integer_To_Characters(TIndirect);
-            buffer[TOffset] = cTDirect[0];
-            buffer[TOffset + 1] = cTDirect[1];
-            buffer[TOffset + 2] = cTDirect[2];
-            buffer[TOffset + 3] = cTDirect[3];
+            if (TIndirect != 0) {
+                char* buffer2 = readBlock(TIndirect);
+                for (int i = 0; i < 4096; i++) {
+                    buffer2[i] = 0;
+                }
+                writeBlock(TIndirect, buffer2);
+                char* cTDirect = integer_To_Characters(TIndirect);
+                buffer[TOffset] = cTDirect[0];
+                buffer[TOffset + 1] = cTDirect[1];
+                buffer[TOffset + 2] = cTDirect[2];
+                buffer[TOffset + 3] = cTDirect[3];
 
-            delete buffer2, cTDirect;
+                delete buffer2, cTDirect;
+            } else {
+                full = true;
+            }
         } else {
             char cTDirect[4];
             cTDirect[0] = buffer[TOffset];
@@ -789,17 +819,24 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
             cTDirect[3] = buffer[TOffset + 3];
             TIndirect = characters_To_Integer(cTDirect);
         }
-        char* buffer2 = readBlock(TIndirect);
-        for (int i = 0; i < 4096; i += 4) {
-            found = my_Add_Address_DIndirect(buffer2, i, blockNumber);
-            if (found) {
-                writeBlock(TIndirect, buffer);
-                break;
+        if (!full) {
+            char* buffer2 = readBlock(TIndirect);
+            for (int i = 0; i < 4096; i += 4) {
+                found = my_Add_Address_DIndirect(buffer2, i, blockNumber, full);
+                if (full) {
+                    break;
+                }
+                if (found) {
+                    writeBlock(TIndirect, buffer);
+                    break;
+                }
             }
+            delete buffer2;
         }
-        delete buffer2;
     }
-
+    if (full) { //Should already be true, but made it explicit.
+        found = false;
+    }
     delete location, buffer;
     return found;
 }
@@ -992,17 +1029,23 @@ void FileSystem::my_write_dir(int directoryInodeNum, int entryInodeNum, string n
     char* buffer = readBlock(blockNumber);
     int dirSize = characters_To_Integer(&buffer[offset + 15]);
     int lastIndirectBlock;
+    int extendResult = true;
     if (dirSize < 49152) {
         lastIndirectBlock = 0;
     } else {
         lastIndirectBlock = ((dirSize - 49152) / 4194304) + 1;
     }
 
+    //Work through the first 12 addresses
     bool placedEntry = false;
     int* blockNums = get_addresses(directoryInodeNum, 0);
     for(int i = 0; i < 12; i++) {
         if (blockNums[i] == 0) {
-            //my_extend(directoryInodeNum); uncomment when implimented
+            extendResult = my_extend(directoryInodeNum);
+            if (!extendResult) {
+                break;
+            }
+            my_Set_Size(directoryInodeNum, my_Read_Size(directoryInodeNum) + 8 * 4096); //The size of the directory could be off if extend quietly fails
             delete blockNums;
             blockNums = get_addresses(directoryInodeNum, 0);
 
@@ -1014,18 +1057,26 @@ void FileSystem::my_write_dir(int directoryInodeNum, int entryInodeNum, string n
     }
     delete blockNums;
 
-    if (!placedEntry) {
+    //Work through every other address
+    if (!placedEntry && extendResult) {
         for (int i = 1; i < lastIndirectBlock; i++) {
             blockNums = get_addresses(directoryInodeNum, i);
             for (int j = 0; j < 1024; i++) {
                 if (blockNums[i] == 0) {
-                    //my_extend(directoryInodeNum); uncomment when implimented
+                    extendResult = my_extend(directoryInodeNum);
+                    if (!extendResult) {
+                        break;
+                    }
+                    my_Set_Size(directoryInodeNum, my_Read_Size(directoryInodeNum) + 8 * 4096); //The size of the directory could be off if extend quietly fails
                     delete blockNums;
                     blockNums = get_addresses(directoryInodeNum, i);
                 }
                 placedEntry = add_entry_to_block(blockNums[i], entryInodeNum, name);
             }
             delete blockNums;
+            if (!extendResult) {
+                break;
+            }
         }
     }
     if (placedEntry) {
@@ -1036,6 +1087,7 @@ void FileSystem::my_write_dir(int directoryInodeNum, int entryInodeNum, string n
 
 //******************************************************************************
 //Somewhat tested
+//Returns the position of the next entry, -1 otherwise.
 int FileSystem::my_remove_entry(int directoryInodeNum, int position) {
     //Returns -1 if trying to remove an entry from an empty block
     //Byte 9 and bytes 4-7 are offsets from the current position/start of entry
@@ -1153,18 +1205,22 @@ int FileSystem::my_read_dir(int directoryInodeNum, int position, int& inodeNumbe
 //******************************************************************************
 
 //Somewhat tested
+//Returns the position of the desired entry, -1 otherwise.
 int FileSystem::my_search_dir(int dirInode, string name, int& inodeNum) {
+    //
     int inode = -1;
-    int entryPosition;
+    int entryPosition = -1;
+    int lastPosition;
     int position = 0;
     string entryName;
     int entryInodeNum;
     char entryType;
     while (inode == -1 && position != -1) {
-        entryPosition = position;
+        lastPosition = position;
         position = my_read_dir(dirInode, position, entryInodeNum, entryName, entryType);
         if (name.compare(entryName) == 0) {
             inode = entryInodeNum;
+            entryPosition = lastPosition;
         }
     }
     inodeNum = inode;
@@ -1180,6 +1236,7 @@ int FileSystem::my_search_dir(int dirInode, string name) {
 
 //******************************************************************************
 //Somewhat tested
+//Returns the i-node number of the file with the given path. -1 if it doesn't exist.
 int FileSystem::my_readPath(string path, int& parentInode, string& name) {
     //Returns the inode number of the file at the end of the given path/
     //Returns -1 if the last file does not exist.
@@ -1227,6 +1284,7 @@ int FileSystem::my_readPath(string path) {
 int FileSystem::my_mkdir(string path, int user, int group) {
     char mode[2] = {125, 160};
     int myInodeNum = create_inode(mode, user, group);
+    my_Set_Size(myInodeNum, 4096);
     int parentInodeNum;
     string name;
     my_readPath(path, parentInodeNum, name);
@@ -1237,16 +1295,27 @@ int FileSystem::my_mkdir(string path, int user, int group) {
 
 //******************************************************************************
 //Somewhat tested
-void FileSystem::my_rmdir(string path) {
+bool FileSystem::my_rmdir(string path) {
     //Maybe should return a boolean success fail
+    bool success = false;
     string name;
     int parInodeNum;
     int myInodeNum;
-    my_readPath(path, parInodeNum, name);
-    int position = my_search_dir(parInodeNum, name, myInodeNum);
-    //cout << "\nposition remove " << position << endl;
-    my_remove_entry(parInodeNum, position);
-    cout << "rmdir " << name << endl;
+    int throwAwayI;
+    string throwAwayS;
+    char throwAwayC;
+    myInodeNum = my_readPath(path, parInodeNum, name);
+    int isEmpty = my_read_dir(myInodeNum, 0, throwAwayI, throwAwayS, throwAwayC);
+    if (isEmpty == -1) {
+        int position = my_search_dir(parInodeNum, name);
+        //cout << "\nposition remove " << position << endl;
+        if (position != -1) {
+            my_remove_entry(parInodeNum, position);
+            success = true;
+        }
+    }
+    cout << "rmdir " << name << " " << (success ? "success" : "failed") << endl;
+    return success;
 }
 
 //******************************************************************************
@@ -1258,35 +1327,123 @@ int FileSystem::create_inode(char* mode, int user, int group) {
     bool* currentBits;
     bool exit = false;
     int inodeNumber = -1;
-    for (int i = 0; i < 4096; i++) {
-        currentBits = character_To_Binary(buffer[i]);
-        for (int j = 0; j < 8; j++) {
-            if (!currentBits[j]) {
-                currentBits[j] = true;
-                buffer[i] = binary_To_Character(currentBits);
-                writeBlock(17, buffer);
-                inodeNumber = i * 8 + j;
-                exit = true;
+    int blockNumber = single_Allocate();
+    if (blockNumber != 0) { //If there is room to create the file.
+        for (int i = 0; i < 4096; i++) {
+            currentBits = character_To_Binary(buffer[i]);
+            for (int j = 0; j < 8; j++) {
+                if (!currentBits[j]) {
+                    currentBits[j] = true;
+                    buffer[i] = binary_To_Character(currentBits);
+                    writeBlock(17, buffer);
+                    inodeNumber = i * 8 + j;
+                    exit = true;
+                    break;
+                }
+            }
+            if (exit) {
                 break;
             }
         }
-        if (exit) {
-            break;
+
+        if (inodeNumber != -1) {
+            my_Set_Mode(inodeNumber, mode);
+            my_Set_UID(inodeNumber, user);
+            my_Set_GID(inodeNumber, group);
+            my_Set_ATime(inodeNumber);
+            my_Set_MTime(inodeNumber);
+            my_Set_CTime(inodeNumber);
+
+            my_Add_Address(inodeNumber, blockNumber);
         }
     }
-
-    if (inodeNumber != -1) {
-        my_Set_Mode(inodeNumber, mode);
-        my_Set_UID(inodeNumber, user);
-        my_Set_GID(inodeNumber, group);
-        my_Set_ATime(inodeNumber);
-        my_Set_MTime(inodeNumber);
-        my_Set_CTime(inodeNumber);
-
-        int blockNumber = single_Allocate();
-        my_Add_Address(inodeNumber, blockNumber);
-    }
+    
     return inodeNumber;
+} 
+
+//******************************************************************************
+
+// Needs testing and debuging.
+// Needs testing.
+char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
+	char* rc;
+	char* temp;
+	rc = new char[nBytes];
+	int fileSize = my_Read_Size(inodeNumber);
+	if (position > fileSize || (position + nBytes) > fileSize) {
+		cerr << "start of read position plus the length of read to be read is greater than the file's size";
+		abort();
+	}
+	int* fileBlocks = get_addresses(inodeNumber,0);
+	int blockNum = position / BLOCKSIZE; //which block in the file to start with
+	int startingPos = position % BLOCKSIZE; // should the position not be in the first block
+	int currentByte = 0;
+	if (blockNum < sizeof(fileBlocks)) {
+		temp = readBlock(fileBlocks[blockNum]);
+		for (int j = startingPos; j < BLOCKSIZE; j++) {
+			if (currentByte < nBytes) {
+				rc[currentByte] = temp[j];
+			} else {
+				break;
+			}
+			currentByte++;
+		}
+		if (currentByte < nBytes) { // more to be read
+			blockNum++;
+			for (; blockNum < sizeof(fileBlocks);blockNum++) {
+				if (currentByte < nBytes) {
+					temp = readBlock(fileBlocks[blockNum]);
+					for (int j = 0; j < BLOCKSIZE; j++) {
+						if (currentByte < nBytes) {
+							rc[currentByte] = temp[j];
+						} else {
+							break;
+						}
+						currentByte++;
+					}
+				} else {
+					break;
+				}
+			}
+		}
+	}
+	// if the file has more than sizeof(fileBlocks) blocks and still more to be read 
+	if (fileSize > (BLOCKSIZE *(sizeof(fileBlocks))) + 1 && (currentByte < nBytes)) {
+		delete fileBlocks;
+		blockNum = 0; // set to 0 to make fileBlocks[] easier 
+		int* fileBlocks = get_addresses(inodeNumber, 1);
+		
+		if (currentByte == 0) {
+			for (int j = startingPos; j < BLOCKSIZE; j++) {
+				if (currentByte < nBytes) {
+					rc[currentByte] = temp[j];
+				} else {
+					break;
+				}
+				currentByte++;
+			}
+			blockNum++;
+		}
+		
+		for (; blockNum < sizeof(fileBlocks);blockNum++) {
+			if (currentByte < nBytes) {
+				temp = readBlock(fileBlocks[blockNum]);
+				for (int j = 0; j < BLOCKSIZE; j++) {
+					if (currentByte < nBytes) {
+						rc[currentByte] = temp[j];
+					} else {
+						break;
+					}
+					currentByte++;
+				}
+			} else {
+				break;
+			}
+		}
+	}
+	
+	delete temp, fileBlocks;
+	return rc;
 }
 
 //******************************************************************************
@@ -1446,6 +1603,8 @@ int main() {
     //FS.my_mkdir("/apples", 15, 15);
 
     FS.print_dir("/directory");
+    //FS.my_rmdir("/pictures");
+    //FS.my_rmdir("/directory");
     FS.my_rmdir("/directory/peeps");
     FS.print_dir("/directory");
 
