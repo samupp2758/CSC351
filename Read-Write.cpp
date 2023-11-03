@@ -633,20 +633,19 @@ bool FileSystem::my_extend(int inodeNumber) {
     // are marked as free.
     int startingBlock = 0;
     bool rc = false;
-    bool temp;
+    bool successfulAdd;
     startingBlock = allocate();
-    if (startingBlock != 0) {
-        if(startingBlock != 0) {
+    if(startingBlock != 0) {
         for(int x = startingBlock; x < (startingBlock + 8); x++) {
-            temp = my_Add_Address(inodeNumber, x);
-            if (!temp) {
+            successfulAdd = my_Add_Address(inodeNumber, x);
+            if (!successfulAdd) {
                 mark_blocks_free(&x, 1);
             }
         }
         rc = true;
-        }
     }
     return rc;
+
 }
 
 //******************************************************************************
