@@ -38,8 +38,8 @@ class FileSystem {
         int allocate();
         bool my_extend(int inodeNumber);
         bool my_Add_Address(int inodeNumber, int blockNumber);
-        bool my_Add_Address_Indirect(char* block, int location, int blockNumber);
-        bool my_Add_Address_DIndirect(char* block, int location, int blockNumber);
+        bool my_Add_Address_Indirect(char* block, int location, int blockNumber, bool full);
+        bool my_Add_Address_DIndirect(char* block, int location, int blockNumber, bool full);
         int* get_addresses(int inodeNumber, int indirect_block);
         void my_write_dir(int directoryInodeNum, int entryInodeNum, string name);
         bool add_entry_to_block(int blockNumber, int entryInodeNum, string name);
@@ -51,7 +51,7 @@ class FileSystem {
         int my_search_dir(int dirInode, string name, int& iNodeNum);
         int my_search_dir(int dirInode, string name);
         int my_mkdir(string path, int user, int group);
-        void my_rmdir(string path);
+        bool my_rmdir(string path);
         void my_Delete(int inodeNumber);
         void mark_inode_free(int inodeNumber);
         void mark_blocks_free(int* blockNumbers, int size);
