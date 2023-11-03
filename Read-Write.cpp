@@ -1063,7 +1063,10 @@ void FileSystem::my_write_dir(int directoryInodeNum, int entryInodeNum, string n
             blockNums = get_addresses(directoryInodeNum, i);
             for (int j = 0; j < 1024; i++) {
                 if (blockNums[i] == 0) {
-                    my_extend(directoryInodeNum);
+                    extendResult = my_extend(directoryInodeNum);
+                    if (!extendResult) {
+                        break;
+                    }
                     my_Set_Size(directoryInodeNum, my_Read_Size(directoryInodeNum) + 8 * 4096); //The size of the directory could be off if extend quietly fails
                     delete blockNums;
                     blockNums = get_addresses(directoryInodeNum, i);
@@ -1071,6 +1074,9 @@ void FileSystem::my_write_dir(int directoryInodeNum, int entryInodeNum, string n
                 placedEntry = add_entry_to_block(blockNums[i], entryInodeNum, name);
             }
             delete blockNums;
+            if (!extendResult) {
+                break;
+            }
         }
     }
     if (placedEntry) {
