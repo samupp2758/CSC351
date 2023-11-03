@@ -14,8 +14,8 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <fstream>
-#include "json.hpp"
-#include "bits/stdc++.h"
+#include "./utils/json.hpp"
+#include "./utils/bits/stdc++.h"
 using json = nlohmann::json;
 using namespace std;
 //Shell side
