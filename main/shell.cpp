@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
     int status = connect(clientSd, (sockaddr*) &sendSockAddr, sizeof(sendSockAddr));
     if(status < 0)
     {
-        cout<<"Error connecting to socket!"<<endl;
+        cout<<"Error connecting to the FS!"<<endl;
         return -1;
     }
     cout << "Connected to the FS!" << endl;
@@ -175,14 +175,16 @@ int main(int argc, char *argv[])
         cout << curDir << " -> ";
         getline(cin, data);
         memset(&msg, 0, sizeof(msg));//clear the buffer
-        
-        if(data == "exit" || data == "shutdown"){
-            strcpy(msg, data.c_str());
-            cout << "Closing..." << endl;
-            send(clientSd, (char*)&msg, strlen(msg), 0);
-            break;
-        }else{
-            execute(data,user,clientSd);
+
+        if(strlen(data.c_str()) > 0){
+            if(data == "exit" || data == "shutdown"){
+                strcpy(msg, data.c_str());
+                cout << "Closing..." << endl;
+                send(clientSd, (char*)&msg, strlen(msg), 0);
+                break;
+            }else{
+                execute(data,user,clientSd);
+            }
         }
 
     }
