@@ -126,19 +126,18 @@ void execute(string msg,json user,int clientSd){
     string data = "";
     char** ss = line_splitter(&msg[0]);
 
-    
-        if(strcmp( ss[0], "exit")) data = msg;
-        else if(!strcmp( ss[0], "ls")) my_ls(ss,user,clientSd);
-        else if(!strcmp( ss[0], "cd")) my_cd(ss,user,clientSd);
-        else if(!strcmp( ss[0], "mkdir")) my_mkdir(ss,user,clientSd);
-        else if(!strcmp( ss[0], "Lcp")) my_Lcp(ss,user,clientSd);
-        else if(!strcmp( ss[0], "Icp")) my_Icp(ss,user,clientSd);
-        else{
-            string d = "shell: command not found: ";
-            d.append(ss[0]);
-            cout << d << endl;
-            data.append("error");
-        } 
+    if(!strcmp( ss[0], "exit")) data = msg;
+    else if(!strcmp( ss[0], "ls")) my_ls(ss,user,clientSd);
+    else if(!strcmp( ss[0], "cd")) my_cd(ss,user,clientSd);
+    else if(!strcmp( ss[0], "mkdir")) my_mkdir(ss,user,clientSd);
+    else if(!strcmp( ss[0], "Lcp")) my_Lcp(ss,user,clientSd);
+    else if(!strcmp( ss[0], "Icp")) my_Icp(ss,user,clientSd);
+    else{
+        string d = "shell: command not found: ";
+        d.append(ss[0]);
+        cout << d << endl;
+        data.append("error");
+    } 
 
 }
 
@@ -177,17 +176,17 @@ int main(int argc, char *argv[])
         getline(cin, data);
         memset(&msg, 0, sizeof(msg));//clear the buffer
         
-        //TODO exit
-        if(data == "shutdown"){
+        if(data == "exit" || data == "shutdown"){
             strcpy(msg, data.c_str());
             cout << "Closing..." << endl;
             send(clientSd, (char*)&msg, strlen(msg), 0);
             break;
+        }else{
+            execute(data,user,clientSd);
         }
 
-        execute(data,user,clientSd);
-
     }
+    
     close(clientSd);
     return 0;    
 }

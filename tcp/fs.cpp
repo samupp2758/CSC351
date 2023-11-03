@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include "json.hpp"
+//#include "../FS.h"
 using json = nlohmann::json;
 using namespace std;
 //FS side
@@ -24,11 +25,12 @@ is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
 char* execute(string msg){
+
     json response;
     string res = "";
         if(strcmp( &msg[0], "exit")){
             json j = json::parse(msg);
-            response["message"] = j["call"];
+            response["call"] = j["call"];
 
             if(j["call"] == "my_getPerm"){
                 response["message"] = "cool beans";
@@ -64,6 +66,8 @@ char* execute(string msg){
 //******************************************************************************
 
 int main(int argc, char *argv[]){
+
+    //FileSystem FS("./fs.dat");
 
     int port = 230;
     char msg[4096]; //message is 4096 bytes long
@@ -103,25 +107,23 @@ int main(int argc, char *argv[]){
 
     cout << "Connected with the shell!" << endl;
     while(1){
-        
         memset(&msg, 0, sizeof(msg));//clear the buffer
         recv(newSd, (char*)&msg, sizeof(msg), 0); //receives message
     
-
-        if(!strcmp(msg, "shutdown")){
+        if(!strcmp(msg, "exit")){
+            close(newSd);
+            newSd = accept(serverSd, (sockaddr *)&newSockAddr, &newSockAddrSize);
+        }else if(!strcmp(msg, "shutdown")){
             cout << "Closing..." << endl;
             send(newSd, (char*)&msg, strlen(msg), 0);
             break;
-        }
-
-        if(strlen(msg) != 0){
+        }else if(strlen(msg) != 0){
             cout << "Request:" << msg << endl;
             strcpy(msg, execute(msg)); //message handler
             cout << "Response:" << msg << endl;
             send(newSd, (char*)&msg, strlen(msg), 0); //sends response
         }
 
-    
     }
 
     close(newSd);
