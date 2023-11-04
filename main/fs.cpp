@@ -29,28 +29,35 @@ char* execute(string msg){
     json response;
     string res = "";
         if(strcmp( &msg[0], "exit")){
-            json j = json::parse(msg);
-            response["call"] = j["call"];
+            json request = json::parse(msg);
+            response["call"] = request["call"];
 
-            if(j["call"] == "my_getPerm"){
-                response["message"] = "cool beans";
-            }else if(j["call"] == "my_readPath"){
-                response["inode"] = 1283198237;
-            }else if(j["call"] == "my_Read_Size"){
-                response["message"] = 10;
-            }else if(j["call"] == "my_read_dir"){
+            if(request["call"] == "my_getPerm"){
+                response["permission"] = true;
+            }else if(request["call"] == "my_readPath"){
+                response["inodeNumber"] = 1283198237;
+            }else if(request["call"] == "my_Read_Size"){
+                response["size"] = 10;
+            }else if(request["call"] == "my_read_dir"){
+                response["inodeNumber"] = 1293817231829;
+                response["nextPos"] = (int)request["position"] < 9 ? ((int)request["position"]+1) : -1;
                 response["type"] = "cooltype";
-                response["name"] = "name";
-            }else if(j["call"] == "my_Read_Mode"){
-            }else if(j["call"] == "my_Read_nlinks"){
-            }else if(j["call"] == "my_Read_UID"){
-            }else if(j["call"] == "my_Read_GID"){
-            }else if(j["call"] == "my_Read_MTime"){
-            }else if(j["call"] == "my_read"){
-            }else if(j["call"] == "my_mkdir"){
+                response["name"] = "coolfilename";
+            }else if(request["call"] == "my_Read_Mode"){
+                response["mode"] = "101011100";
+            }else if(request["call"] == "my_Read_nlinks"){
+                response["nlinks"] = 12345;
+            }else if(request["call"] == "my_Read_UID"){
+                response["UID"] = 0;
+            }else if(request["call"] == "my_Read_GID"){
+                response["GID"] = 0;
+            }else if(request["call"] == "my_Read_MTime"){
+                response["MTime"] = to_string(123894571823);
+            }else if(request["call"] == "my_read"){
+            }else if(request["call"] == "my_mkdir"){
             }else{
                 string data = "";
-                data.append(j["call"]);
+                data.append(request["call"]);
                 data.append(": call not found!");
                 response = {{"error",true},{"message",data}};
             }    
