@@ -414,44 +414,6 @@ int FileSystem::my_Read_CTime(int inodeNumber) {
 
 //******************************************************************************
 
-//Needs to test
-//Returns the number of blocks that the given file
-int FileSystem::get_block_use(int inodeNumber) {
-    int numberOfBlocks = 0;
-    bool done = false;
-    int indirectBlock = 0;
-
-    int* addresses = get_addresses(inodeNumber, indirectBlock);
-    for (int i = 0; i < 12; i++) {
-        if (addresses[i] != 0) {
-            numberOfBlocks++;
-        } else {
-            done = true;
-            break;
-        }
-    }
-    delete addresses;
-
-    indirectBlock++;
-    while (!done && indirectBlock < 1049602) {
-        addresses = get_addresses(inodeNumber, indirectBlock);
-        for (int i = 0; i < 1024; i++) {
-            if (addresses[i] != 0) {
-                numberOfBlocks++;
-            } else {
-                done = true;
-                break;
-            }
-        }
-        delete addresses;
-        indirectBlock++;
-    }
-
-    return numberOfBlocks;
-}
-
-//******************************************************************************
-
 int* FileSystem::my_index_inodes(int inodeNumber) {
     int* result = new int[2];
     result[0] = (inodeNumber / 32) + 18;
@@ -522,7 +484,7 @@ void FileSystem::my_Delete(int inodeNumber) {
     delete blockNums;
     if (end == 12) {
         end = 4096;
-        while (end == 4096 && indirectBlock < 1049602) {
+        while (end == 4096 && indirectBlock < 1048578) {
             indirectBlock++;
             blockNums = get_addresses(inodeNumber, indirectBlock);
             for (int i = 0; i < 4096; i++) {
@@ -667,6 +629,7 @@ int FileSystem::allocate() {
 
 bool* FileSystem::set_comparePerms(int UID, int GID, int inodeNumber) {
     bool* binaryPerms = new bool[3];
+    //cout<<"INODDDEEE: "<<inodeNumber<<endl;
     // get mode with permision bits,UID,GID
     char *mode = my_Read_Mode(inodeNumber);
     int nodeUID = my_Read_UID(inodeNumber);
@@ -676,24 +639,33 @@ bool* FileSystem::set_comparePerms(int UID, int GID, int inodeNumber) {
     bool *firstMode = character_To_Binary(mode[0]);
     // 0-2
     bool *secondMode = character_To_Binary(mode[1]);
-
+    //cout << "nUID:"<<nodeUID<<" gID:"<<nodeGID<<endl;
+    //cout<<"myUID: "<<UID<<" myGID:"<<GID<<endl;
+    
+    
+    
     // Check if UID = nodeUID
     if (UID == nodeUID) {
+        cout<<"can use UID"<<endl;
         // if user owns file, keep user permisions
         binaryPerms[0] = firstMode[2];
         binaryPerms[1] = firstMode[3];
         binaryPerms[2] = firstMode[4];
      // check if caller is member of group
     } else if (GID == nodeGID) {
+        cout<<"can use GID"<<endl;
         // if caller is member of group, keep group perms
         binaryPerms[0] = firstMode[5];
         binaryPerms[1] = firstMode[6];
         binaryPerms[2] = firstMode[7];
     } else {
         // keep all world permisions
+        cout<<"can use else"<<endl;
+        //cout<<"yeeye"<<secondMode[0]<<secondMode[1]<<secondMode[2]<<endl;
         binaryPerms[0] = secondMode[0];
         binaryPerms[1] = secondMode[1];
         binaryPerms[2] = secondMode[2];
+        //cout<<"tata"<<binaryPerms[0]<<binaryPerms[1]<<binaryPerms[2]<<endl;
     }
 
 
@@ -744,40 +716,47 @@ int FileSystem::my_getPerm(string path, int UID, int GID) {
         while (path[i] != '/' && path.length() > i) {
             currentName += path[i];
             i++;
+            //cout<<"teeeeee"<<i<<endl;
         }
         parentInodeNum = currentInodeNum;
         //set currentInodeNum to i-node for currentPath Name
         my_search_dir(parentInodeNum,currentName,currentInodeNum);
-        i++;
         //get permisions for current path
-        tempPerms = set_comparePerms(UID,GID,currentInodeNum);
+        tempPerms = set_comparePerms(UID,GID,parentInodeNum);
         
+        //cout<<"taaaaaa "<<i<<endl;
         //if more to do check that can execute
         if (path.length() > i && tempPerms[2] == 0) {
             //if cant execute into further directories break loop and set perms ---
+            //cout<<"HERE"<<endl;
             flag = false;
             perms[0] = 0;
             perms[1] = 0;
             perms[2] = 0;
-        //if no more to do, set perms to temp perms, we are done
+        
+        //Nothing more to do, set perms to temp perms, we are done
         } else if (path.length() == i) {
+            //cout<<"Length:"<<path.length()<<" i: "<<i<<endl;
+            flag = false;
             perms = tempPerms;
+            //cout <<"toodle"<<perms[0]<<perms[1]<<perms[2]<<endl;
         //if more work to do and can execute
-        } else if (path.length() > i && tempPerms[2] == 1) {
-            cout<<"able to continue"<<endl;
-            continue;
         }
-        //remove dynamic alloc mem for tempPerms
-        delete tempPerms;
+        i++;
     }
-
+    //cout<<perms[0]<<perms[1]<<perms[2]<<endl;
     //take perms convert to int
     for(int j = 2; j > -1 ;j--) {
+        //cout << j<<":";
         if (perms[j] == 1) {
+            //cout<<perms[j]<<endl;
             permCode += 1 << (2-j);
+            //cout<<"perms "<<perms[j]<<" codeCount "<<permCode<<endl;
         }
     }
 
+    //remove dynamic alloc mem for tempPerms
+    delete tempPerms;
     return permCode;
 }
 
@@ -1035,7 +1014,7 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
             result[i] = characters_To_Integer(&IBuffer[i * 4]);
         }
         delete DIBuffer, IBuffer;
-    } else if (indirect_block < 1049602) {
+    } else if (indirect_block < 1048578) {
         result = new int[1024];
         char* TIBuffer = readBlock(characters_To_Integer(&buffer[75 + offset]));
         int DINum = (indirect_block - 2) / 1024;
@@ -1605,125 +1584,6 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 
 //******************************************************************************
 
-bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffer) {
-	bool success = true;
-	int numberOfBlocks = 0;
-	int currentByte = 0;
-	int start = 0;
-	int startBlock = 0;
-	int indirectBlockNumber = 0;
-	char* newBuffer;
-	int* fileBlocks;
-	newBuffer = new char[BLOCKSIZE];
-	
-	if(position > my_Read_Size(inodeNumber)) {
-		success = false;
-		cerr << "write position greater than the size of the existing file." << endl;
-	}
-	
-	if (success) {
-		if (position > 0) {
-			start = position % BLOCKSIZE;
-			startBlock = (position - start) / BLOCKSIZE;
-		}
-		// if starting block is not in first indirect block map.
-		if (startBlock > 11) { 
-			startBlock = startBlock - 12;
-			indirectBlockNumber = ((startBlock - (startBlock % 1024)) / 1024) + 1; //find starting indirect block
-			startBlock = startBlock % 1024; // mod by size of indirect block map size
-		}
-		
-		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
-		numberOfBlocks = (((nBytes + start) - ((nBytes + start) % BLOCKSIZE))/BLOCKSIZE) + 1;
-		
-		// check if my_extend() will ever fail before write / wont be able to complete write.
-		int nb = numberOfBlocks;
-		int ibn = indirectBlockNumber;	//temp variables
-		for (int i = startBlock; i < nb; i++) {
-			if (ibn == 0) {
-				if (i > 11) {
-					nb = nb - 12;
-					i = i - 12;
-					ibn++;
-					fileBlocks = get_addresses(inodeNumber, ibn);
-				}
-			} else if (ibn > 0) {
-				if (i > 1024) {
-					nb = nb - 1024;
-					i = i - 1024;
-					ibn++;
-					fileBlocks = get_addresses(inodeNumber, ibn);
-				}
-			}
-			if (fileBlocks[i] == 0) {
-				success = my_extend(inodeNumber);
-			}
-			if (!success) {
-				break;
-			}
-		}
-		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
-	}
-	if (success) {
-	
-		if (start != 0) {
-			char * temp = readBlock(fileBlocks[startBlock]);
-			for (int i = 0; i < start; i++) {
-				newBuffer[i] = temp[i];
-			}
-			delete temp;
-		}
-		
-		for (int i = startBlock; i < numberOfBlocks; i++) {
-			if (currentByte >= nBytes) {
-				break;
-			}
-			
-			if (indirectBlockNumber == 0) {
-				if (i > 11) {
-					numberOfBlocks = numberOfBlocks - 12;
-					i = i - 12;
-					indirectBlockNumber++;
-					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
-				}
-			} else if (indirectBlockNumber > 0) {
-				if (i > 1024) {
-					numberOfBlocks = numberOfBlocks - 1024;
-					i = i - 1024;
-					indirectBlockNumber++;
-					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
-				}
-			}
-			
-			for (int j = 0; j < BLOCKSIZE; j++) {
-				if (currentByte == nBytes) {
-					char * temp = readBlock(fileBlocks[i]);
-					for (j; j < BLOCKSIZE; j++) {
-						newBuffer[j] = temp[j];
-					}
-					delete temp;
-					break;
-				} else {
-				newBuffer[j] = buffer[(i * BLOCKSIZE) + j];
-				currentByte++;
-				}
-			}
-			writeBlock(fileBlocks[i], newBuffer);	
-		}
-	
-		my_Set_Size(inodeNumber, my_Read_Size(inodeNumber) + nBytes);
-		my_Set_MTime(inodeNumber);
-		
-	} else {
-		cerr << "Write has failed" << endl;
-	}
-	
-	delete newBuffer, fileBlocks;
-	return success;
-}
-
-//******************************************************************************
-
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
@@ -1867,4 +1727,191 @@ void FileSystem::print_dir(string path) {
         entryName = "";
     }
     cout << display << endl;
+}
+//******************************************************************************
+//call set_mode manually
+//create 2 boolean arrays set bits
+//set_mode characters to i_node
+
+int main() {
+    FileSystem FS("disk.dat");
+
+    //FS.clearFS();
+    //FS.createDataFile(1024 * 1024, "disk.dat");
+
+    //char* result = FS.my_Read_Mode(2);
+
+    //cout << result[0] << " " << result[1];
+    char* buffer = new char[4096];
+    FS.Create_New_FS("disk.dat");
+    FS.my_mkdir("/directory", 15, 15);
+    FS.my_mkdir("/pictures", 15, 15);
+    FS.my_mkdir("/directory/peeps", 15, 15);
+    //FS.my_mkdir("/apples", 15, 15);
+
+    FS.print_dir("/directory");
+    //FS.my_rmdir("/pictures");
+    //FS.my_rmdir("/directory");
+    //FS.my_rmdir("/directory/peeps");
+    //FS.print_dir("/directory");
+
+    
+    for (int i = 0; i < 4096; i++) {
+        buffer[i] = 'A';
+    }
+    //FS.writeBlock(1042, buffer);
+    /*
+    int nums[83];
+    for(int i = 0; i < 83; i++) {
+        nums[i] = 33000 + i;
+    }
+    FS.mark_blocks_free(&nums[0], 83);
+    */
+
+    /*
+    char *mode = FS.my_Read_Mode(1);
+    bool *firstMode = FS.character_To_Binary(mode[0]);
+    bool *secondMode = FS.character_To_Binary(mode[1]);
+    for(int j = 2; j < 8;j++){
+        cout<<firstMode[j];
+    }
+    cout<<":";
+    for(int j = 0; j < 3;j++){
+        cout<<secondMode[j];
+    }
+    cout<<endl;
+
+    string path = "/directory/peeps";
+    int num;
+    FS.my_readPath(path, num);
+
+    int gid = FS.my_Read_GID(1);
+    int uid = FS.my_Read_UID(1);
+    cout << "gid " << gid << "uid " << uid << endl;
+
+    mode = FS.my_Read_Mode(0);
+    firstMode = FS.character_To_Binary(mode[0]);
+    secondMode = FS.character_To_Binary(mode[1]);
+
+    for(int j = 2; j < 8;j++){
+        cout<<firstMode[j];
+    }
+    cout<<":";
+    for(int j = 0; j < 3;j++){
+        cout<<secondMode[j];
+    }
+    cout<<endl;
+
+    gid = FS.my_Read_GID(0);
+    uid = FS.my_Read_UID(0);
+    cout << "gid " << gid << "uid " << uid << endl;
+
+
+
+    int result = FS.my_getPerm(path,0,0);
+    cout<<"inode of peeps"<<num<<endl;
+    cout<<result<<endl;
+
+    delete mode;
+    delete firstMode;
+    delete secondMode;
+    
+    */
+    /*for (int i = 0; i < 512; i++) {
+        buffer[i * 8] = '1';
+        buffer[i * 8 + 1] = '2';
+        buffer[i * 8 + 2] = '3';
+        buffer[i * 8 + 3] = '4';
+        buffer[i * 8 + 4] = '5';
+        buffer[i * 8 + 5] = '6';
+        buffer[i * 8 + 6] = '7';
+        buffer[i * 8 + 7] = '8';
+    }*/
+
+    /*
+    for (int i = 0; i < 4096; i++) {
+        buffer[i] = 'A';
+    }
+    
+    char* mode = FS.my_Read_Mode(0);
+    bool* mode1 = FS.character_To_Binary(mode[0]);
+    bool* mode2 = FS.character_To_Binary(mode[1]);
+    int UID = FS.my_Read_UID(0);
+    int GID = FS.my_Read_GID(0);
+    time_t ATime = (time_t)FS.my_Read_ATime(0);
+    time_t MTime = (time_t)FS.my_Read_MTime(0);
+    time_t CTime = (time_t)FS.my_Read_CTime(0);
+
+    cout << "Mode: ";
+    for(int i = 0; i < 8; i++) {
+        cout << mode1[i] << " ";
+    }
+    for(int i = 0; i < 8; i++) {
+        cout << mode2[i] << " ";
+    }
+    cout << endl;
+    cout << "UID: " << UID << endl;
+    cout << "GID: " << GID << endl;
+    cout << "ATime: " << ctime(&ATime) << endl;
+    cout << "MTime: " << ctime(&MTime) << endl;
+    cout << "CTime: " << ctime(&CTime) << endl;
+
+    int* address = FS.my_index_inodes(0);
+    char* buffer2 = FS.readBlock(address[0]);
+    int blockNumber = FS.characters_To_Integer(&buffer2[address[1] + 19]);
+    int blockNumber2 = FS.characters_To_Integer(&buffer2[address[1] + 23]);
+    int blockNumber3 = FS.characters_To_Integer(&buffer2[address[1] + 27]);
+    int blockNumber4 = FS.characters_To_Integer(&buffer2[address[1] + 31]);
+    cout << "Address1: " << blockNumber << endl;
+    cout << "Address2: " << blockNumber2 << endl;
+    cout << "Address3: " << blockNumber3 << endl;
+    cout << "Address4: " << blockNumber4 << endl;
+    */
+    
+
+    /*
+    cout << "bits: ";
+    bool* bits = FS.character_To_Binary(128);
+    for (int i = 0; i < 8; i++) {
+        cout << bits[i];
+    }
+    cout << endl;
+    */
+
+    //cout << FS.single_Allocate();
+
+    /*
+    bool* data = FS.character_To_Binary(0);
+    for (int i = 0; i < 8; i++) {
+        cout << data[i] << " ";
+    }
+    cout << endl;
+
+    cout << (int)FS.binary_To_Character(data);
+    */
+
+
+    //FS.clearFS();
+    //FS.createDataFile(1024*1024);
+
+    //string strData = "HelloWorldBlock1";
+    //char *data = new char[8192];
+    //for (int i = 0; i < 40; i++) {
+    //    data[i] = '1';
+    //}
+
+    //FS.writeBlock(0, data);
+
+
+
+    //char* results = FS.readBlock(0);  
+
+    //int numBlocks = FS.readFileIn("demo.txt", 0);
+    //FS.readFileOut("demo2.txt", 0, 1);
+
+    //cout << numBlocks;
+    //FSData << "some text f\n";
+    //FSData.seekp(30);
+    //FSData << "some text f2";
+    FS.disk.close();
 }
