@@ -36,6 +36,8 @@ class FileSystem {
         int create_inode(char* mode, int user, int group);
         int single_Allocate();
         int allocate();
+        int my_getPerm(string path, int UID, int GID);
+        bool* set_comparePerms(int UID, int GID, int inodeNumber);
         bool my_extend(int inodeNumber);
         bool my_Add_Address(int inodeNumber, int blockNumber);
         bool my_Add_Address_Indirect(char* block, int location, int blockNumber, bool full);
@@ -84,6 +86,7 @@ class FileSystem {
         char binary_To_Character(bool* binary);
         char* integer_To_Characters(int num);
         int characters_To_Integer(char* chars);
+        int decimal_To_Binary(int num);
 
         //Debugging
         void print_inode_bitmap();
