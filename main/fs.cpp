@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include "_tcp_fs.h"
+#define bzero(b,len) (memset((b), '\0', (len)), (void) 0)
 using namespace std;
 // FS side
 
