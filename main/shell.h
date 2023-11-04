@@ -1,6 +1,8 @@
 #ifndef S_H
 #define S_H
 
+#include <chrono>
+#include <termios.h>
 #include <typeinfo>
 #include <iostream>
 #include <string>
@@ -23,6 +25,8 @@
 #include <set>
 using json = nlohmann::json;
 using namespace std;
+using namespace std::chrono;
+
 
     class Shell{
         private:
@@ -34,6 +38,7 @@ using namespace std;
             int clientSd;
             json user;
             string curDir;
+            string *history;
             char *request(json req_json);
             void execute(string data);
             void my_ls(char**input);
@@ -42,6 +47,8 @@ using namespace std;
             void my_Lcp(char**input);
             void my_Icp(char**input);
             string to_abspath(string raw);
+
+            void build_ls(json callResponses, char* r);
 
             void chdir();
             void opendir();
