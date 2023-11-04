@@ -726,18 +726,18 @@ int FileSystem::my_getPerm(string path, int UID, int GID) {
     bool* perms = new bool[3];
     bool* tempPerms = new bool[3];
     bool flag = true;
-    int permCode;
+    int permCode = 0;
     int i = 1;
     int currentInodeNum = 0;
     int parentInodeNum = -1;
     string currentName = "root";
 
-/*
+
     //Store permisions defauld rwx for all
-    for(int j = 0;j < 8; j++){
-        binaryPerms[j] = 1;
+    for(int j = 0;j < 3; j++){
+        perms[j] = 1;
     }
-*/
+
     //loop through path looking at each directory or file and can still edit
     while (path.length() > i && flag) {
         currentName = "";
