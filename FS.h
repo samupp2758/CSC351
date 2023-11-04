@@ -56,6 +56,7 @@ class FileSystem {
         void mark_inode_free(int inodeNumber);
         void mark_blocks_free(int* blockNumbers, int size);
         char* my_Read(int inodeNumber, int position, int nBytes);
+		bool my_Write(int inodeNumber, int position, int nBytes, char* buffer);
 
         //inode helper functions
         void my_Set_Mode(int inodeNumber, char* mode);

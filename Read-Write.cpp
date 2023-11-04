@@ -1486,6 +1486,125 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 
 //******************************************************************************
 
+bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffer) {
+	bool success = true;
+	int numberOfBlocks = 0;
+	int currentByte = 0;
+	int start = 0;
+	int startBlock = 0;
+	int indirectBlockNumber = 0;
+	char* newBuffer;
+	int* fileBlocks;
+	newBuffer = new char[BLOCKSIZE];
+	
+	if(position > my_Read_Size(inodeNumber)) {
+		success = false;
+		cerr << "write position greater than the size of the existing file." << endl;
+	}
+	
+	if (success) {
+		if (position > 0) {
+			start = position % BLOCKSIZE;
+			startBlock = (position - start) / BLOCKSIZE;
+		}
+		// if starting block is not in first indirect block map.
+		if (startBlock > 11) { 
+			startBlock = startBlock - 12;
+			indirectBlockNumber = ((startBlock - (startBlock % 1024)) / 1024) + 1; //find starting indirect block
+			startBlock = startBlock % 1024; // mod by size of indirect block map size
+		}
+		
+		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+		numberOfBlocks = (((nBytes + start) - ((nBytes + start) % BLOCKSIZE))/BLOCKSIZE) + 1;
+		
+		// check if my_extend() will ever fail before write / wont be able to complete write.
+		int nb = numberOfBlocks;
+		int ibn = indirectBlockNumber;	//temp variables
+		for (int i = startBlock; i < nb; i++) {
+			if (ibn == 0) {
+				if (i > 11) {
+					nb = nb - 12;
+					i = i - 12;
+					ibn++;
+					fileBlocks = get_addresses(inodeNumber, ibn);
+				}
+			} else if (ibn > 0) {
+				if (i > 1024) {
+					nb = nb - 1024;
+					i = i - 1024;
+					ibn++;
+					fileBlocks = get_addresses(inodeNumber, ibn);
+				}
+			}
+			if (fileBlocks[i] == 0) {
+				success = my_extend(inodeNumber);
+			}
+			if (!success) {
+				break;
+			}
+		}
+		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+	}
+	if (success) {
+	
+		if (start != 0) {
+			char * temp = readBlock(fileBlocks[startBlock]);
+			for (int i = 0; i < start; i++) {
+				newBuffer[i] = temp[i];
+			}
+			delete temp;
+		}
+		
+		for (int i = startBlock; i < numberOfBlocks; i++) {
+			if (currentByte >= nBytes) {
+				break;
+			}
+			
+			if (indirectBlockNumber == 0) {
+				if (i > 11) {
+					numberOfBlocks = numberOfBlocks - 12;
+					i = i - 12;
+					indirectBlockNumber++;
+					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+				}
+			} else if (indirectBlockNumber > 0) {
+				if (i > 1024) {
+					numberOfBlocks = numberOfBlocks - 1024;
+					i = i - 1024;
+					indirectBlockNumber++;
+					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+				}
+			}
+			
+			for (int j = 0; j < BLOCKSIZE; j++) {
+				if (currentByte == nBytes) {
+					char * temp = readBlock(fileBlocks[i]);
+					for (j; j < BLOCKSIZE; j++) {
+						newBuffer[j] = temp[j];
+					}
+					delete temp;
+					break;
+				} else {
+				newBuffer[j] = buffer[(i * BLOCKSIZE) + j];
+				currentByte++;
+				}
+			}
+			writeBlock(fileBlocks[i], newBuffer);	
+		}
+	
+		my_Set_Size(inodeNumber, my_Read_Size(inodeNumber) + nBytes);
+		my_Set_MTime(inodeNumber);
+		
+	} else {
+		cerr << "Write has failed" << endl;
+	}
+	
+	delete newBuffer, fileBlocks;
+	return success;
+}
+
+//******************************************************************************
+
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
