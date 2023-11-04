@@ -148,6 +148,7 @@ void FileSystem::my_Set_Mode(int inodeNumber, char* mode) {
 
 char* FileSystem::my_Read_Mode(int inodeNumber) {
     int blockNumber = (inodeNumber / 32) + 18;
+    //position within block
     int offset = (inodeNumber % 32) * 128;
     char* result = new char[2];
     char* buffer = readBlock(blockNumber);
@@ -624,6 +625,124 @@ int FileSystem::allocate() {
     }
     return blockNumber;
 }
+//******************************************************************************
+
+bool* FileSystem::set_comparePerms(int UID, int GID, int inodeNumber) {
+    bool* binaryPerms = new bool[3];
+    // get mode with permision bits,UID,GID
+    char *mode = my_Read_Mode(inodeNumber);
+    int nodeUID = my_Read_UID(inodeNumber);
+    int nodeGID = my_Read_GID(inodeNumber);
+    // compare default to node perms
+    // 2-7
+    bool *firstMode = character_To_Binary(mode[0]);
+    // 0-2
+    bool *secondMode = character_To_Binary(mode[1]);
+
+    // Check if UID = nodeUID
+    if (UID == nodeUID) {
+        // if user owns file, keep user permisions
+        binaryPerms[0] = firstMode[2];
+        binaryPerms[1] = firstMode[3];
+        binaryPerms[2] = firstMode[4];
+     // check if caller is member of group
+    } else if (GID == nodeGID) {
+        // if caller is member of group, keep group perms
+        binaryPerms[0] = firstMode[5];
+        binaryPerms[1] = firstMode[6];
+        binaryPerms[2] = firstMode[7];
+    } else {
+        // keep all world permisions
+        binaryPerms[0] = secondMode[0];
+        binaryPerms[1] = secondMode[1];
+        binaryPerms[2] = secondMode[2];
+    }
+
+
+/*
+    //now that I have permisions, take U|G|W
+    //store to permRes
+    //read perms(0,3,6)
+    permRes[0] = binaryPerms[0]|binaryPerms[3]|binaryPerms[6];
+    //write perms(1,4,7)
+    permRes[1] = binaryPerms[1]|binaryPerms[4]|binaryPerms[7];
+    //execute perms(2,5,8)
+    permRes[2] = binaryPerms[2]|binaryPerms[5]|binaryPerms[8];
+
+    //set perms to permRest---TRIED PASS BY REFERENCE COULDNT FIX,MAYBE ASK NATE HELP
+    //perms = permRes;
+*/
+    //delete dynam alloc memory
+    delete mode;
+    delete firstMode;
+    delete secondMode;
+    
+    //return rwx perms
+    return binaryPerms;
+}
+
+//******************************************************************************
+//Not Tested
+//Return max permisions for path given UID and GID
+int FileSystem::my_getPerm(string path, int UID, int GID) {
+    bool* perms = new bool[3];
+    bool* tempPerms = new bool[3];
+    bool flag = true;
+    int permCode;
+    int i = 1;
+    int currentInodeNum = 0;
+    int parentInodeNum = -1;
+    string currentName = "root";
+
+/*
+    //Store permisions defauld rwx for all
+    for(int j = 0;j < 8; j++){
+        binaryPerms[j] = 1;
+    }
+*/
+    //loop through path looking at each directory or file and can still edit
+    while (path.length() > i && flag) {
+        currentName = "";
+        while (path[i] != '/' && path.length() > i) {
+            currentName += path[i];
+            i++;
+        }
+        parentInodeNum = currentInodeNum;
+        //set currentInodeNum to i-node for currentPath Name
+        my_search_dir(parentInodeNum,currentName,currentInodeNum);
+        i++;
+        //get permisions for current path
+        tempPerms = set_comparePerms(UID,GID,currentInodeNum);
+        
+        //if more to do check that can execute
+        if (path.length() > i && tempPerms[2] == 0) {
+            //if cant execute into further directories break loop and set perms ---
+            flag = false;
+            perms[0] = 0;
+            perms[1] = 0;
+            perms[2] = 0;
+        //if no more to do, set perms to temp perms, we are done
+        } else if (path.length() == i) {
+            perms = tempPerms;
+        //if more work to do and can execute
+        } else if (path.length() > i && tempPerms[2] == 1) {
+            cout<<"able to continue"<<endl;
+            continue;
+        }
+        //remove dynamic alloc mem for tempPerms
+        delete tempPerms;
+    }
+
+    //take perms convert to int
+    for(int j = 2; j > -1 ;j--) {
+        if (perms[j] == 1) {
+            permCode += 1 << (2-j);
+        }
+    }
+
+    return permCode;
+}
+
 
 //******************************************************************************
 
@@ -1245,7 +1364,7 @@ int FileSystem::my_readPath(string path, int& parentInode, string& name) {
     int i = 1;
     int currentInodeNum = 0;
     int parentInodeNum = -1;
-    string currentName;
+    string currentName = "root";
 
     while(path.length() > i) {
         currentName = "";
@@ -1530,6 +1649,14 @@ int FileSystem::characters_To_Integer(char* chars) {
 
 //******************************************************************************
 
+int FileSystem::decimal_To_Binary(int num) {
+    const int size = 32;
+    int binaryArray[size];
+    return 0;
+}
+
+//******************************************************************************
+
 void FileSystem::print_inode_bitmap() {
     char* buffer = readBlock(17);
     bool* bits;
@@ -1585,6 +1712,9 @@ void FileSystem::print_dir(string path) {
     cout << display << endl;
 }
 //******************************************************************************
+//call set_mode manually
+//create 2 boolean arrays set bits
+//set_mode characters to i_node
 
 int main() {
     FileSystem FS("disk.dat");
