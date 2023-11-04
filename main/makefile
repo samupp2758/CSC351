@@ -1,5 +1,5 @@
 all: makefile
 
-makefile: shell.cpp fs.cpp
-	g++ -std=c++11 fs.cpp -o fs
-	g++ -std=c++11 shell.cpp -o shell
+makefile: shell.cpp fs.cpp ../Read-Write.cpp
+	g++ -std=c++17 ../Read-Write.cpp fs.cpp -o fs
+	g++ -std=c++17 shell.cpp -o shell

@@ -14,9 +14,7 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <fstream>
-#include "./utils/json.hpp"
-//#include "../FS.h"
-using json = nlohmann::json;
+#include "_tcp_fs.h"
 using namespace std;
 //FS side
 
@@ -24,8 +22,8 @@ using namespace std;
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
-char* execute(string msg){
-
+char* FS_CONNECTOR::execute(string msg){
+    FileSystem FS(this->file_name);
     json response;
     string res = "";
         if(strcmp( &msg[0], "exit")){
@@ -34,27 +32,58 @@ char* execute(string msg){
 
             if(request["call"] == "my_getPerm"){
                 response["permission"] = true;
+                //******************************************************************************
             }else if(request["call"] == "my_readPath"){
-                response["inodeNumber"] = 1283198237;
+                response["inodeNumber"] = FS.my_readPath(request["path"]);
+                //******************************************************************************
             }else if(request["call"] == "my_Read_Size"){
-                response["size"] = 10;
+                response["size"] = FS.my_Read_Size(request["inodeNumber"]);
+                //******************************************************************************
             }else if(request["call"] == "my_read_dir"){
-                response["inodeNumber"] = 1293817231829;
-                response["nextPos"] = (int)request["position"] < 9 ? ((int)request["position"]+1) : -1;
-                response["type"] = "cooltype";
-                response["name"] = "coolfilename";
+                int inodenumber;
+                string name;
+                char type;
+                int nextPos = FS.my_read_dir(
+                    request["inodeNumber"],
+                    request["position"],
+                    inodenumber,
+                    name,
+                    type);
+                response["nextPos"] = nextPos;
+                response["inodeNumber"] = inodenumber;
+                response["type"] = type;
+                response["name"] = name;
+                //******************************************************************************
             }else if(request["call"] == "my_Read_Mode"){
-                response["mode"] = "101011100";
+                response["mode"] = FS.my_Read_Mode(request["inodeNumber"]);
+                //******************************************************************************
             }else if(request["call"] == "my_Read_nlinks"){
-                response["nlinks"] = 12345;
+                response["nlinks"] = FS.my_Read_nlinks(request["inodeNumber"]);
+                //******************************************************************************
             }else if(request["call"] == "my_Read_UID"){
-                response["UID"] = 0;
+                response["UID"] = FS.my_Read_UID(request["inodeNumber"]);
+                //************s******************************************************************
             }else if(request["call"] == "my_Read_GID"){
-                response["GID"] = 0;
+                response["GID"] = FS.my_Read_GID(request["inodeNumber"]);
+                //******************************************************************************
             }else if(request["call"] == "my_Read_MTime"){
-                response["MTime"] = to_string(123894571823);
-            }else if(request["call"] == "my_read"){
+                response["MTime"] = FS.my_Read_MTime(request["inodeNumber"]);
+                //******************************************************************************
             }else if(request["call"] == "my_mkdir"){
+                response["status"] = FS.my_mkdir(
+                    request["path"],
+                    request["user"]["UID"],
+                    request["user"]["GID"]);
+                //******************************************************************************
+            }else if(request["call"] == "my_create"){
+                //******************************************************************************
+            }else if(request["call"] == "my_write"){
+                request["status"] = FS.my_Write(
+                request["inodeNumber"],
+                request["position"],
+                request["nBytes"],
+                &(std::string(request["buffer"]))[0]);
+                //******************************************************************************
             }else{
                 string data = "";
                 data.append(request["call"]);
@@ -70,11 +99,20 @@ char* execute(string msg){
     return cstr;
 }
 
+//*************s*****************************************************************
+
+FS_CONNECTOR::FS_CONNECTOR(string file){
+    this->file_name = file;
+}
+
+FS_CONNECTOR::~FS_CONNECTOR(){
+}
+
 //******************************************************************************
 
 int main(int argc, char *argv[]){
 
-    //FileSystem FS("./fs.dat");
+    FS_CONNECTOR FS_C =  FS_CONNECTOR("./fs.dat");
 
     int port = 230;
     char msg[4096]; //message is 4096 bytes long
@@ -126,7 +164,7 @@ int main(int argc, char *argv[]){
             break;
         }else if(strlen(msg) != 0){
             cout << "Request:" << msg << endl;
-            strcpy(msg, execute(msg)); //message handler
+            strcpy(msg, FS_C.execute(msg)); //message handler
             cout << "Response:" << msg << endl;
             send(newSd, (char*)&msg, strlen(msg), 0); //sends response
         }

@@ -101,7 +101,7 @@ void Shell::my_ls(char**input){
             json file_data = {{}};
             json readDirForm = {
                 {"call","my_read_dir"}, //get name, type, inodenumber
-                {"inode",callResponses[1]["inodeNumber"]},
+                {"inodeNumber",callResponses[1]["inodeNumber"]},
                 {"position",count}
             };
             r = request(readDirForm);
