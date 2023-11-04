@@ -413,6 +413,44 @@ int FileSystem::my_Read_CTime(int inodeNumber) {
 
 //******************************************************************************
 
+//Needs to test
+//Returns the number of blocks that the given file
+int FileSystem::get_block_use(int inodeNumber) {
+    int numberOfBlocks = 0;
+    bool done = false;
+    int indirectBlock = 0;
+
+    int* addresses = get_addresses(inodeNumber, indirectBlock);
+    for (int i = 0; i < 12; i++) {
+        if (addresses[i] != 0) {
+            numberOfBlocks++;
+        } else {
+            done = true;
+            break;
+        }
+    }
+    delete addresses;
+
+    indirectBlock++;
+    while (!done && indirectBlock < 1049602) {
+        addresses = get_addresses(inodeNumber, indirectBlock);
+        for (int i = 0; i < 1024; i++) {
+            if (addresses[i] != 0) {
+                numberOfBlocks++;
+            } else {
+                done = true;
+                break;
+            }
+        }
+        delete addresses;
+        indirectBlock++;
+    }
+
+    return numberOfBlocks;
+}
+
+//******************************************************************************
+
 int* FileSystem::my_index_inodes(int inodeNumber) {
     int* result = new int[2];
     result[0] = (inodeNumber / 32) + 18;
@@ -483,7 +521,7 @@ void FileSystem::my_Delete(int inodeNumber) {
     delete blockNums;
     if (end == 12) {
         end = 4096;
-        while (end == 4096 && indirectBlock < 1048578) {
+        while (end == 4096 && indirectBlock < 1049602) {
             indirectBlock++;
             blockNums = get_addresses(inodeNumber, indirectBlock);
             for (int i = 0; i < 4096; i++) {
@@ -878,7 +916,7 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
             result[i] = characters_To_Integer(&IBuffer[i * 4]);
         }
         delete DIBuffer, IBuffer;
-    } else if (indirect_block < 1048578) {
+    } else if (indirect_block < 1049602) {
         result = new int[1024];
         char* TIBuffer = readBlock(characters_To_Integer(&buffer[75 + offset]));
         int DINum = (indirect_block - 2) / 1024;
