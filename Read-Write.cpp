@@ -667,6 +667,7 @@ int FileSystem::allocate() {
 
 bool* FileSystem::set_comparePerms(int UID, int GID, int inodeNumber) {
     bool* binaryPerms = new bool[3];
+    //cout<<"INODDDEEE: "<<inodeNumber<<endl;
     // get mode with permision bits,UID,GID
     char *mode = my_Read_Mode(inodeNumber);
     int nodeUID = my_Read_UID(inodeNumber);
@@ -676,24 +677,33 @@ bool* FileSystem::set_comparePerms(int UID, int GID, int inodeNumber) {
     bool *firstMode = character_To_Binary(mode[0]);
     // 0-2
     bool *secondMode = character_To_Binary(mode[1]);
-
+    //cout << "nUID:"<<nodeUID<<" gID:"<<nodeGID<<endl;
+    //cout<<"myUID: "<<UID<<" myGID:"<<GID<<endl;
+    
+    
+    
     // Check if UID = nodeUID
     if (UID == nodeUID) {
+        cout<<"can use UID"<<endl;
         // if user owns file, keep user permisions
         binaryPerms[0] = firstMode[2];
         binaryPerms[1] = firstMode[3];
         binaryPerms[2] = firstMode[4];
      // check if caller is member of group
     } else if (GID == nodeGID) {
+        cout<<"can use GID"<<endl;
         // if caller is member of group, keep group perms
         binaryPerms[0] = firstMode[5];
         binaryPerms[1] = firstMode[6];
         binaryPerms[2] = firstMode[7];
     } else {
         // keep all world permisions
+        cout<<"can use else"<<endl;
+        //cout<<"yeeye"<<secondMode[0]<<secondMode[1]<<secondMode[2]<<endl;
         binaryPerms[0] = secondMode[0];
         binaryPerms[1] = secondMode[1];
         binaryPerms[2] = secondMode[2];
+        //cout<<"tata"<<binaryPerms[0]<<binaryPerms[1]<<binaryPerms[2]<<endl;
     }
 
 
@@ -744,40 +754,47 @@ int FileSystem::my_getPerm(string path, int UID, int GID) {
         while (path[i] != '/' && path.length() > i) {
             currentName += path[i];
             i++;
+            //cout<<"teeeeee"<<i<<endl;
         }
         parentInodeNum = currentInodeNum;
         //set currentInodeNum to i-node for currentPath Name
         my_search_dir(parentInodeNum,currentName,currentInodeNum);
-        i++;
         //get permisions for current path
-        tempPerms = set_comparePerms(UID,GID,currentInodeNum);
+        tempPerms = set_comparePerms(UID,GID,parentInodeNum);
         
+        //cout<<"taaaaaa "<<i<<endl;
         //if more to do check that can execute
         if (path.length() > i && tempPerms[2] == 0) {
             //if cant execute into further directories break loop and set perms ---
+            //cout<<"HERE"<<endl;
             flag = false;
             perms[0] = 0;
             perms[1] = 0;
             perms[2] = 0;
-        //if no more to do, set perms to temp perms, we are done
+        
+        //Nothing more to do, set perms to temp perms, we are done
         } else if (path.length() == i) {
+            //cout<<"Length:"<<path.length()<<" i: "<<i<<endl;
+            flag = false;
             perms = tempPerms;
+            //cout <<"toodle"<<perms[0]<<perms[1]<<perms[2]<<endl;
         //if more work to do and can execute
-        } else if (path.length() > i && tempPerms[2] == 1) {
-            cout<<"able to continue"<<endl;
-            continue;
         }
-        //remove dynamic alloc mem for tempPerms
-        delete tempPerms;
+        i++;
     }
-
+    //cout<<perms[0]<<perms[1]<<perms[2]<<endl;
     //take perms convert to int
     for(int j = 2; j > -1 ;j--) {
+        //cout << j<<":";
         if (perms[j] == 1) {
+            //cout<<perms[j]<<endl;
             permCode += 1 << (2-j);
+            //cout<<"perms "<<perms[j]<<" codeCount "<<permCode<<endl;
         }
     }
 
+    //remove dynamic alloc mem for tempPerms
+    delete tempPerms;
     return permCode;
 }
 
