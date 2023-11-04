@@ -414,6 +414,44 @@ int FileSystem::my_Read_CTime(int inodeNumber) {
 
 //******************************************************************************
 
+//Needs to test
+//Returns the number of blocks that the given file
+int FileSystem::get_block_use(int inodeNumber) {
+    int numberOfBlocks = 0;
+    bool done = false;
+    int indirectBlock = 0;
+
+    int* addresses = get_addresses(inodeNumber, indirectBlock);
+    for (int i = 0; i < 12; i++) {
+        if (addresses[i] != 0) {
+            numberOfBlocks++;
+        } else {
+            done = true;
+            break;
+        }
+    }
+    delete addresses;
+
+    indirectBlock++;
+    while (!done && indirectBlock < 1049602) {
+        addresses = get_addresses(inodeNumber, indirectBlock);
+        for (int i = 0; i < 1024; i++) {
+            if (addresses[i] != 0) {
+                numberOfBlocks++;
+            } else {
+                done = true;
+                break;
+            }
+        }
+        delete addresses;
+        indirectBlock++;
+    }
+
+    return numberOfBlocks;
+}
+
+//******************************************************************************
+
 int* FileSystem::my_index_inodes(int inodeNumber) {
     int* result = new int[2];
     result[0] = (inodeNumber / 32) + 18;
@@ -484,7 +522,7 @@ void FileSystem::my_Delete(int inodeNumber) {
     delete blockNums;
     if (end == 12) {
         end = 4096;
-        while (end == 4096 && indirectBlock < 1048578) {
+        while (end == 4096 && indirectBlock < 1049602) {
             indirectBlock++;
             blockNums = get_addresses(inodeNumber, indirectBlock);
             for (int i = 0; i < 4096; i++) {
@@ -997,7 +1035,7 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
             result[i] = characters_To_Integer(&IBuffer[i * 4]);
         }
         delete DIBuffer, IBuffer;
-    } else if (indirect_block < 1048578) {
+    } else if (indirect_block < 1049602) {
         result = new int[1024];
         char* TIBuffer = readBlock(characters_To_Integer(&buffer[75 + offset]));
         int DINum = (indirect_block - 2) / 1024;
@@ -1567,6 +1605,125 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 
 //******************************************************************************
 
+bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffer) {
+	bool success = true;
+	int numberOfBlocks = 0;
+	int currentByte = 0;
+	int start = 0;
+	int startBlock = 0;
+	int indirectBlockNumber = 0;
+	char* newBuffer;
+	int* fileBlocks;
+	newBuffer = new char[BLOCKSIZE];
+	
+	if(position > my_Read_Size(inodeNumber)) {
+		success = false;
+		cerr << "write position greater than the size of the existing file." << endl;
+	}
+	
+	if (success) {
+		if (position > 0) {
+			start = position % BLOCKSIZE;
+			startBlock = (position - start) / BLOCKSIZE;
+		}
+		// if starting block is not in first indirect block map.
+		if (startBlock > 11) { 
+			startBlock = startBlock - 12;
+			indirectBlockNumber = ((startBlock - (startBlock % 1024)) / 1024) + 1; //find starting indirect block
+			startBlock = startBlock % 1024; // mod by size of indirect block map size
+		}
+		
+		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+		numberOfBlocks = (((nBytes + start) - ((nBytes + start) % BLOCKSIZE))/BLOCKSIZE) + 1;
+		
+		// check if my_extend() will ever fail before write / wont be able to complete write.
+		int nb = numberOfBlocks;
+		int ibn = indirectBlockNumber;	//temp variables
+		for (int i = startBlock; i < nb; i++) {
+			if (ibn == 0) {
+				if (i > 11) {
+					nb = nb - 12;
+					i = i - 12;
+					ibn++;
+					fileBlocks = get_addresses(inodeNumber, ibn);
+				}
+			} else if (ibn > 0) {
+				if (i > 1024) {
+					nb = nb - 1024;
+					i = i - 1024;
+					ibn++;
+					fileBlocks = get_addresses(inodeNumber, ibn);
+				}
+			}
+			if (fileBlocks[i] == 0) {
+				success = my_extend(inodeNumber);
+			}
+			if (!success) {
+				break;
+			}
+		}
+		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+	}
+	if (success) {
+	
+		if (start != 0) {
+			char * temp = readBlock(fileBlocks[startBlock]);
+			for (int i = 0; i < start; i++) {
+				newBuffer[i] = temp[i];
+			}
+			delete temp;
+		}
+		
+		for (int i = startBlock; i < numberOfBlocks; i++) {
+			if (currentByte >= nBytes) {
+				break;
+			}
+			
+			if (indirectBlockNumber == 0) {
+				if (i > 11) {
+					numberOfBlocks = numberOfBlocks - 12;
+					i = i - 12;
+					indirectBlockNumber++;
+					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+				}
+			} else if (indirectBlockNumber > 0) {
+				if (i > 1024) {
+					numberOfBlocks = numberOfBlocks - 1024;
+					i = i - 1024;
+					indirectBlockNumber++;
+					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+				}
+			}
+			
+			for (int j = 0; j < BLOCKSIZE; j++) {
+				if (currentByte == nBytes) {
+					char * temp = readBlock(fileBlocks[i]);
+					for (j; j < BLOCKSIZE; j++) {
+						newBuffer[j] = temp[j];
+					}
+					delete temp;
+					break;
+				} else {
+				newBuffer[j] = buffer[(i * BLOCKSIZE) + j];
+				currentByte++;
+				}
+			}
+			writeBlock(fileBlocks[i], newBuffer);	
+		}
+	
+		my_Set_Size(inodeNumber, my_Read_Size(inodeNumber) + nBytes);
+		my_Set_MTime(inodeNumber);
+		
+	} else {
+		cerr << "Write has failed" << endl;
+	}
+	
+	delete newBuffer, fileBlocks;
+	return success;
+}
+
+//******************************************************************************
+
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
@@ -1710,147 +1867,4 @@ void FileSystem::print_dir(string path) {
         entryName = "";
     }
     cout << display << endl;
-}
-//******************************************************************************
-//call set_mode manually
-//create 2 boolean arrays set bits
-//set_mode characters to i_node
-
-int main() {
-    FileSystem FS("disk.dat");
-
-    //FS.clearFS();
-    //FS.createDataFile(1024 * 1024, "disk.dat");
-
-    //char* result = FS.my_Read_Mode(2);
-
-    //cout << result[0] << " " << result[1];
-    char* buffer = new char[4096];
-    FS.Create_New_FS("disk.dat");
-    FS.my_mkdir("/directory", 15, 15);
-    FS.my_mkdir("/pictures", 15, 15);
-    FS.my_mkdir("/directory/peeps", 15, 15);
-    //FS.my_mkdir("/apples", 15, 15);
-
-    FS.print_dir("/directory");
-    //FS.my_rmdir("/pictures");
-    //FS.my_rmdir("/directory");
-    FS.my_rmdir("/directory/peeps");
-    FS.print_dir("/directory");
-
-    
-    for (int i = 0; i < 4096; i++) {
-        buffer[i] = 'A';
-    }
-    //FS.writeBlock(1042, buffer);
-    /*
-    int nums[83];
-    for(int i = 0; i < 83; i++) {
-        nums[i] = 33000 + i;
-    }
-    FS.mark_blocks_free(&nums[0], 83);
-    */
-
-    //string path = "/the/way/the/truth/and/the/light";
-    //int num;
-    //FS.my_readPath(path, num);
-
-
-    /*for (int i = 0; i < 512; i++) {
-        buffer[i * 8] = '1';
-        buffer[i * 8 + 1] = '2';
-        buffer[i * 8 + 2] = '3';
-        buffer[i * 8 + 3] = '4';
-        buffer[i * 8 + 4] = '5';
-        buffer[i * 8 + 5] = '6';
-        buffer[i * 8 + 6] = '7';
-        buffer[i * 8 + 7] = '8';
-    }*/
-
-    /*
-    for (int i = 0; i < 4096; i++) {
-        buffer[i] = 'A';
-    }
-    
-    char* mode = FS.my_Read_Mode(0);
-    bool* mode1 = FS.character_To_Binary(mode[0]);
-    bool* mode2 = FS.character_To_Binary(mode[1]);
-    int UID = FS.my_Read_UID(0);
-    int GID = FS.my_Read_GID(0);
-    time_t ATime = (time_t)FS.my_Read_ATime(0);
-    time_t MTime = (time_t)FS.my_Read_MTime(0);
-    time_t CTime = (time_t)FS.my_Read_CTime(0);
-
-    cout << "Mode: ";
-    for(int i = 0; i < 8; i++) {
-        cout << mode1[i] << " ";
-    }
-    for(int i = 0; i < 8; i++) {
-        cout << mode2[i] << " ";
-    }
-    cout << endl;
-    cout << "UID: " << UID << endl;
-    cout << "GID: " << GID << endl;
-    cout << "ATime: " << ctime(&ATime) << endl;
-    cout << "MTime: " << ctime(&MTime) << endl;
-    cout << "CTime: " << ctime(&CTime) << endl;
-
-    int* address = FS.my_index_inodes(0);
-    char* buffer2 = FS.readBlock(address[0]);
-    int blockNumber = FS.characters_To_Integer(&buffer2[address[1] + 19]);
-    int blockNumber2 = FS.characters_To_Integer(&buffer2[address[1] + 23]);
-    int blockNumber3 = FS.characters_To_Integer(&buffer2[address[1] + 27]);
-    int blockNumber4 = FS.characters_To_Integer(&buffer2[address[1] + 31]);
-    cout << "Address1: " << blockNumber << endl;
-    cout << "Address2: " << blockNumber2 << endl;
-    cout << "Address3: " << blockNumber3 << endl;
-    cout << "Address4: " << blockNumber4 << endl;
-    */
-    
-
-    /*
-    cout << "bits: ";
-    bool* bits = FS.character_To_Binary(128);
-    for (int i = 0; i < 8; i++) {
-        cout << bits[i];
-    }
-    cout << endl;
-    */
-
-    //cout << FS.single_Allocate();
-
-    /*
-    bool* data = FS.character_To_Binary(0);
-    for (int i = 0; i < 8; i++) {
-        cout << data[i] << " ";
-    }
-    cout << endl;
-
-    cout << (int)FS.binary_To_Character(data);
-    */
-
-
-    //FS.clearFS();
-    //FS.createDataFile(1024*1024);
-
-    //string strData = "HelloWorldBlock1";
-    //char *data = new char[8192];
-    //for (int i = 0; i < 40; i++) {
-    //    data[i] = '1';
-    //}
-
-    //FS.writeBlock(0, data);
-
-
-
-    //char* results = FS.readBlock(0);  
-
-    //int numBlocks = FS.readFileIn("demo.txt", 0);
-    //FS.readFileOut("demo2.txt", 0, 1);
-
-    //cout << numBlocks;
-    //FSData << "some text f\n";
-    //FSData.seekp(30);
-    //FSData << "some text f2";
-    FS.disk.close();
 }
