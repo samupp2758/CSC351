@@ -76,6 +76,7 @@ class FileSystem {
         void my_Set_CTime(int inodeNumber);
         int my_Read_CTime(int inodeNumber);
         int* my_index_inodes(int inodeNumber);
+        int get_block_use(int inodeNumber);
 
         //Utility & char conversion
         bool* character_To_Binary(char c);
