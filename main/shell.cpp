@@ -54,16 +54,20 @@ string format_mode(string mode)
     type += mode_array[0];
     type += mode_array[1];
     if(type == "01") type = "d"; else type = "-";
-    int *ss;
+    int *ss = new int[3];
     for(int b = 0;b<3;b++){
-        char* mf = new char[4];
-        for(int i = 2;i<5;i++) mf[i-2] += mode_array[(b*3)+i];
-        cout<<mf<<endl;
-        //ss[b] = stoi(mf,nullptr,2);
+        int mf = 0;
+        for(int i = 4;i>1;i--){
+            char dg = mode_array[(b*3)+i];
+            int val = (int(dg-'0') << (2-(i-2)));
+            mf += val;
+        }
+        ss[b] = mf;
+       // ss[b] = mf;
     }
 
-   /* for(int a = 0;a<3;a++){
-        switch (ss[0])
+    for(int a = 0;a<3;a++){
+        switch (ss[a])
         {
         case 0:permission += "---";break;
         case 1:permission += "--x";break;
@@ -75,7 +79,7 @@ string format_mode(string mode)
         case 7:permission += "rwx";break;
         default:break;
         }
-    }*/
+    }
 
     string rc = type;
     rc += permission;
@@ -87,22 +91,16 @@ string format_mode(string mode)
 // Gets the raw path passed by the user and return its absolute path
 string Shell::to_abspath(string raw)
 {
-    string response;
-    if (!strcmp(&raw[0], ".") || strcmp(&raw[0], "/"))
-    {
-        // Absolute path + relative path
-        char *char_array = new char[sizeof(raw) + 1];
-        strcpy(char_array, raw.c_str());
-        if(!strcmp(&raw[0], ".")) char_array = char_array + 1;
-
-        response.append(raw);
-        // char** path = ::line_splitter(&raw[0],"/");
-        cout << char_array << endl;
-    }
-    return response;
+    return raw;
 }
 
 //******************************************************************************
+
+string Shell::get_parent_path(string path){
+    char **ss = line_splitter(&path[0], "/");
+    int count = 0;
+    return path;
+}
 
 char *Shell::request(json req_json)
 {
@@ -123,6 +121,9 @@ void Shell::build_ls(json callResponses,char* r){
         // Verifies if the my_getPerm received true or false
         // Starts to go over all entries in the i-node
         int count = 0;
+        r = request({{"call","get_block_use"},{"inodeNumber",callResponses[0]["inodeNumber"]}});
+        json res = json::parse((string)r);
+        cout<<"total "<<res["blockuse"]<<endl;
         while (1)
         {
             json file_data = {{}};
@@ -151,10 +152,6 @@ void Shell::build_ls(json callResponses,char* r){
                 // cout<<r<<endl;
                 file_data[i] = json::parse((string)r);
             }   
-
-            r = request({{"call","get_block_use"},{"inodeNumber",callResponses[0]["inodeNumber"]}});
-            json res = json::parse((string)r);
-            cout<<"total "<<res["blockuse"]<<endl;
 
 
             time_t Mtime = (time_t)file_data[5]["MTime"];
@@ -186,38 +183,41 @@ void Shell::my_ls(char **input)
         {{"call", "my_getPerm"}},
     };
 
-    //Requests all the system calls on the list
-    for (int i = 0; i < requestForms.size(); i++){
-        requestForms[i]["path"] = pd;
-        r = request(requestForms[i]);
-        callResponses[i] = json::parse((string)r);
-    }
+    try{
 
-    //Verifies if the path exists
-    if(callResponses[0]["inodeNumber"] == -1){
-        string d = "ls: ";
-        d.append(pd);
-        d.append(": No such file or directory");
-        cout << d << endl;
-    }else{
-        //Verifies if the user has permission to ls
-        switch (int(callResponses[1]["permission"]))
-        {
-        case 4:/* r-- */rc = true;break;
-        case 5:/* r-x */rc = true;break;
-        case 6:/* rw- */rc = true;break;
-        case 7:/* rwx */rc = true;break;
-        default:
-            string d = "ls: access denied: ";
-            d.append(pd);
-            cout << d << endl;
-            break;
+        if(input[2]){
+            throw("Too many arguments!");
         }
 
-        /*If the directory exists and the user has permissions to see it,
-        Builds the ls output by calling all data from all files in the dir*/
-        if (rc) build_ls(callResponses,r);
-    }
+        //Requests all the system calls on the list
+        for (int i = 0; i < requestForms.size(); i++){
+            requestForms[i]["path"] = pd;
+            r = request(requestForms[i]);
+            callResponses[i] = json::parse((string)r);
+        }
+
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            throw("No such file or directory");
+        }
+            //Verifies if the user has permission to ls
+            switch (int(callResponses[1]["permission"]))
+            {
+            case 4:/* r-- */rc = true;break;
+            case 5:/* r-x */rc = true;break;
+            case 6:/* rw- */rc = true;break;
+            case 7:/* rwx */rc = true;break;
+            default:
+                throw "Permission denied";
+                break;
+            }
+
+            /*If the directory exists and the user has permissions to see it,
+            Builds the ls output by calling all data from all files in the dir*/
+            if (rc) build_ls(callResponses,r);
+        }catch(const char* e){
+            cout<<"ls: "<<pd<<": "<<e<<endl;
+        }
 }
 
 //******************************************************************************
@@ -274,10 +274,44 @@ void Shell::my_mkdir(char **input)
 {
     //Verify if the input[1] is empty
     if(input[1] && !input[2]){
-        json requestForm = {
-            {"call", "my_mkdir"},
-            {"path", input[1]}};
-        char *r = request(requestForm);
+        char *r; //Request
+        bool rc = false;
+        json callResponses = {{}};
+        string pd = get_parent_path(to_abspath(input[1]));
+        json requestForms = {
+            {{"call", "my_readPath"}},
+            {{"call", "my_getPerm"}},
+        };
+
+        //Requests all the system calls on the list
+        for (int i = 0; i < requestForms.size(); i++){
+            requestForms[i]["path"] = pd;
+            r = request(requestForms[i]);
+            callResponses[i] = json::parse((string)r);
+        }
+
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            string d = "ls: ";
+            d.append(pd);
+            d.append(": No such file or directory");
+            cout << d << endl;
+        }else{
+            switch (int(callResponses[1]["permission"]))
+                {
+                case 7:/* rwx */rc = true;break;
+                default:
+                    string d = "mkdir: permission denied: ";
+                    d.append(pd);
+                    cout << d << endl;
+                    break;
+                }
+
+            json requestForm = {
+                {"call", "my_mkdir"},
+                {"path", input[1]}};
+            char *r = request(requestForm);
+        }
     }else if(input[2]){
         cout << "mkdir: too many arguments!" << endl;
     }else{
@@ -401,7 +435,6 @@ void Shell::execute(string msg)
 {
     string data = "";
     char **ss = line_splitter(&msg[0], " ");
-
     if (!strcmp(ss[0], "exit"))
         data = msg;
     else if (!strcmp(ss[0], "ls"))
