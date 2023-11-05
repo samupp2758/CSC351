@@ -89,9 +89,43 @@ string format_mode(string mode)
 //******************************************************************************
 
 // Gets the raw path passed by the user and return its absolute path
-string Shell::to_abspath(string raw)
-{
-    return raw;
+string Shell::to_abspath(string raw){
+    int parentcounts = 0;
+    int i = 0;
+    string ans = raw;
+
+    if(raw == "/"){
+        //just skip to end
+    } else{
+        //split raw up and curDir up, then find out how many '..' are included in raw
+        char **ss = line_splitter(&raw[0], "/");
+        char **abs = line_splitter(&curDir[0], "/");
+        while(i < sizeof(ss)) {
+            if(strcmp(ss[i],"..")){
+                parentcounts++;
+            }
+            i++;
+        }
+
+        if(parentcounts <= sizeof(abs)){ //if the number is .. is greater than the amount of directories to go up
+            ans = "/";
+        } else {
+            //put the answer together, starting with the commonality between raw and curDir
+            for(int i = 0; i < sizeof(abs - parentcounts); i++){
+                ans.append("/");
+                ans.append(abs[i]);
+            }
+            //add what is different about raw to answer
+            for(int i = parentcounts; i < sizeof(ss); i++){
+                if(ss[i] != "."){
+                    ans.append("/");
+                    ans.append(ss[i]);
+                }
+            }
+        }
+    }
+
+    return ans;
 }
 
 //******************************************************************************
