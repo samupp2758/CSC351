@@ -89,7 +89,7 @@ string format_mode(string mode)
 //******************************************************************************
 
 // Gets the raw path passed by the user and return its absolute path
-string Shell::to_abspath(string raw){
+string to_abspath(string curDir, string raw){
     int dotcounts = 0;
 	int parentcounts = 0;
     int i = 0;
@@ -101,8 +101,8 @@ string Shell::to_abspath(string raw){
 	ans = raw;
     } else{
         //split raw up and curDir up, then find out how many .. are included in raw
-        char **ss = line_splitter(raw.data(), "/");
-        char **abs = line_splitter(curDir.data(), "/");
+        char **ss = ::line_splitter(raw.data(), "/");
+        char **abs = ::line_splitter(curDir.data(), "/");
 		
         while(ss[i]) {
             if((strcmp(ss[i],"..")) == 0){
@@ -144,7 +144,7 @@ string Shell::to_abspath(string raw){
 
 //******************************************************************************
 
-string Shell::get_parent_path(string path){
+string get_parent_path(string path){
     int i = 0;
     int dircount = 0;
     string ans;
@@ -256,7 +256,7 @@ void Shell::my_ls(char **input)
         if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
             throw help;
         }else{
-            pd = (input[1] ? to_abspath(input[1]) : curDir);
+            pd = (input[1] ? to_abspath(curDir,input[1]) : curDir);
         }
 
         if(input[2]){
@@ -320,7 +320,7 @@ void Shell::my_cd(char **input)
         if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
             throw help;
         }else{
-            pd = (input[1] ? to_abspath(input[1]) : "/");
+            pd = (input[1] ? to_abspath(curDir,input[1]) : "/");
         }
 
         //Requests all the system calls on the list
@@ -372,7 +372,7 @@ void Shell::my_mkdir(char **input)
             char *r; //Request
             bool rc = false;
             json callResponses = {{}};
-            string pd = to_abspath(input[1]);
+            string pd = to_abspath(curDir,input[1]);
             json requestForms = {
                 {{"call", "my_readPath"},{"path",curDir}},
                 {{"call", "my_readPath"},{"path",pd}},
@@ -443,7 +443,7 @@ void Shell::my_Lcp(char **input)
         char* r;
         char buff[3000];
         json callResponses = {{}};
-        string pd = (input[1] ? to_abspath(input[1]) : curDir);
+        string pd = (input[1] ? to_abspath(curDir,input[1]) : curDir);
         json requestForms = {
             {{"call", "my_readPath"}},
             {{"call", "my_getPerm"}},
@@ -517,7 +517,7 @@ void Shell::my_Icp(char **input)
             {{"call", "my_readPath"}},
             {{"call", "my_getPerm"}},
         };
-        string pd = to_abspath(input[2]);
+        string pd = to_abspath(curDir,input[2]);
 
         //Requests all the system calls on the list
         for (int i = 0; i < requestForms.size(); i++){
