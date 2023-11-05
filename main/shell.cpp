@@ -115,10 +115,6 @@ string Shell::to_abspath(string raw){
             parentcounts++;
             j++;
         }
-		//parentcounts = parentcounts - dotcounts;
-		
-		cout << dotcounts << endl;
-		cout << parentcounts << endl;
 		
         if(dotcounts >= parentcounts){ //if the number of .. is greater than the amount of directories to go up
             ans = "/";
@@ -126,17 +122,16 @@ string Shell::to_abspath(string raw){
             //put the answer together, starting with the commonality between raw and curDir
             for(int i = 0; i < parentcounts - dotcounts; i++){
                 if(abs[i]){
-		    ans.append("/");
+					ans.append("/");
                     ans.append(abs[i]);
-		}
-            }
+				}
+			}
 	    //ans.append(ss[0]);
-	    cout << "cur ans is " << ans << endl;
 
             //add what is different about raw to answer
 			int j = dotcounts;
             while(ss[j]){
-                if(ss[j] != "."){
+                if(strcmp(ss[j], ".")){
                     ans.append("/");
                     ans.append(ss[j]);
                 }
@@ -150,7 +145,26 @@ string Shell::to_abspath(string raw){
 //******************************************************************************
 
 string Shell::get_parent_path(string path){
-    string ans = to_abspath("..");
+    int i = 0;
+    int dircount = 0;
+    string ans;
+
+    if(path == "/"){
+        ans = path;
+    }else{
+
+    char **ss = line_splitter(path.data(), "/");
+    while(ss[i]){
+        dircount++;
+        i++;
+    }
+    for(int i = 0; i < dircount -1; i++){
+        if(ss[i]){
+			ans.append("/");
+            ans.append(ss[i]);
+		}
+		}
+    }
     return ans;
 }
 
