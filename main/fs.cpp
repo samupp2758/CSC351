@@ -124,9 +124,9 @@ char *FS_CONNECTOR::execute(string msg)
                 request["user"]["GID"]);
             //******************************************************************************
         }
-        else if (request["call"] == "my_create")
+        else if (request["call"] == "my_read")
         {
-            //******************************************************************************
+            response["buff"] = FS.my_Read(request["iNodeNumber"], request["position"], 3000)
         }
         else if (request["call"] == "my_create")
         {

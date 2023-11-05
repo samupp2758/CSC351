@@ -290,25 +290,106 @@ void Shell::my_mkdir(char **input)
 void Shell::my_Lcp(char **input)
 {
     // check permission that you are able to access that file
+    bool rc = false;
+    char* r;
+    char buff[3000];
+    json callResponses = {{}};
+        string pd = (input[1] ? to_abspath(input[1]) : curDir);
+        json requestForms = {
+            {{"call", "my_readPath"}},
+            {{"call", "my_getPerm"}},
+            {{"call", "my_read"}},
+        };
 
-    // change directiories if needed
+    //Requests all the system calls on the list
+    for (int i = 0; i < requestForms.size(); i++){
+        requestForms[i]["path"] = pd;
+        r = request(requestForms[i]);
+        callResponses[i] = json::parse((string)r);
+    }
 
-    // create the target file on the host system
+    switch (int(callResponses[1]["permission"]))
+        {
+        case 4:/* r-- */rc = true;break;
+        case 5:/* r-x */rc = true;break;
+        case 6:/* rw- */rc = true;break;
+        case 7:/* rwx */rc = true;break;
+        default:
+            string d = "ls: access denied: ";
+            d.append(pd);
+            cout << d << endl;
+            break;
+        }
+    
+    if(rc){
+        // create the target file on the host system using the same name
+        ofstream myfile;
+        myfile.open (input[1]);
 
-    // Copy the file to the buffer, making multiple calls if necessary
+        // Copy the file to the buffer, making multiple calls if necessary, then writing the buffer to the file
+        while(callResponses[2]["buff"] != -1){
+
+        }
+        myfile.close();
+    }
 }
 
 //******************************************************************************
 
 void Shell::my_Icp(char **input)
 {
-    // open the file on the underlying filesystem
+    bool rc = false;
+    char* r;
+    char buff[3000];
+    json callResponses = {{}};
+        string pd = (input[1] ? to_abspath(input[1]) : curDir);
+        json requestForms = {
+            {{"call", "my_readPath"}},
+            {{"call", "my_getPerm"}},
+        };
 
-    // make the local file
+    //Requests all the system calls on the list
+    for (int i = 0; i < requestForms.size(); i++){
+        requestForms[i]["path"] = pd;
+        r = request(requestForms[i]);
+        callResponses[i] = json::parse((string)r);
+    }
+    
+    //checks permission
+    switch (int(callResponses[1]["permission"]))
+        {
+        case 2:/* -w- */rc = true;break;
+        case 3:/* -wx */rc = true;break;
+        case 6:/* rw- */rc = true;break;
+        case 7:/* rwx */rc = true;break;
+        default:
+            string d = "ls: access denied: ";
+            d.append(pd);
+            cout << d << endl;
+            break;
+        }
+        
+    if(rc){
+        // open the file on the underlying filesystem
+        ofstream myfile;
+        myfile.open (input[1]);
+        if(myfile.is_open()){
 
-    // lseek to the beginning of the file on the host system
+            // make the local file
+            for (int i = 0; i < requestForms.size(); i++){
+            requestForms[i]["path"] = pd;
+            r = request(requestForms[i]);
+            callResponses[i] = json::parse((string)r);
+        }
+            // lseek to the beginning of the file on the host system
 
-    // put the blocks in a buffer, then read those to the local file
+            // put the blocks in a buffer, then read those to the local file
+            myfile.close();
+        } else {
+            cout << "Unable to open file on underlying directory" << endl;
+        }
+    }
+
 }
 //******************************************************************************
 
