@@ -122,11 +122,13 @@ char *FS_CONNECTOR::execute(string msg)
                 request["path"],
                 request["user"]["UID"],
                 request["user"]["GID"]);
+
+            response["what"] = request["path"];
             //******************************************************************************
         }
         else if (request["call"] == "my_read")
         {
-            response["buff"] = FS.my_Read(request["iNodeNumber"], request["position"], 3000)
+            response["buffer"] = FS.my_Read(request["iNodeNumber"], request["position"], request["size"]);
         }
         else if (request["call"] == "my_create")
         {
@@ -170,78 +172,96 @@ FS_CONNECTOR::~FS_CONNECTOR()
 
 int main(int argc, char *argv[])
 {
+    //argv[0] is the name of the filesytem
+    //argv[1] is the flag "new filesystem" and it can be 0 or 1
+    string help = "usage ./fs filesytem.dat 0 (0 for just opening, 1 for erasing any filesystem.dat and creating a new filesytem)\n*\n*";
     ::system ("clear");
-    string filename = "./fs.dat";
     int port = 230;
     char msg[4096]; // message is 4096 bytes long
-
-    FS_CONNECTOR FS_C = FS_CONNECTOR(filename);
-    FileSystem FS(filename);
-    FS.Create_New_FS(filename);
-    // setup a socket and connection tools
-    sockaddr_in servAddr;
-    bzero((char *)&servAddr, sizeof(servAddr));
-    servAddr.sin_family = AF_INET;
-    servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servAddr.sin_port = htons(port);
-
-    // open stream oriented socket with internet address
-    // also keep track of the socket descriptor
-    int serverSd = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSd < 0)
-    {
-        cerr << "Error establishing the server socket" << endl;
-        exit(0);
-    }
-
-    int bindStatus = ::bind(serverSd, (struct sockaddr *)&servAddr, sizeof(servAddr));
-
-    if (bindStatus < 0)
-    {
-        cerr << "Error binding socket to local address" << endl;
-        exit(0);
-    }
-
-    cout << "Waiting for the shell to connect..." << endl;
-    listen(serverSd, 5);
-    sockaddr_in newSockAddr;
-    socklen_t newSockAddrSize = sizeof(newSockAddr);
-    int newSd = accept(serverSd, (sockaddr *)&newSockAddr, &newSockAddrSize);
-
-    if (newSd < 0)
-    {
-        cerr << "Error accepting msg from shell!" << endl;
-        exit(1);
-    }
-
-    cout << "Connected with the shell!" << endl;
-    while (1)
-    {
-        memset(&msg, 0, sizeof(msg));              // clear the buffer
-        recv(newSd, (char *)&msg, sizeof(msg), 0); // receives message
-
-        if (!strcmp(msg, "exit"))
-        {
-            close(newSd);
-            newSd = accept(serverSd, (sockaddr *)&newSockAddr, &newSockAddrSize);
+    try{
+        if(!argv[1] || !argv[2]) throw help;
+        string filename = argv[1];
+        cout<<((argv[2])[0] == '0' ? "Opening" : "Creating")<<" filesytem in "<<filename<<""<<endl;
+        
+        FS_CONNECTOR FS_C = FS_CONNECTOR(filename);
+        FileSystem FS(filename);
+        if((argv[2])[0] == '1'){
+            FS.Create_New_FS(filename);
+        }else{
+            ifstream file;
+            file.open(argv[1]);
+            string f = argv[1];
+            f.append(": No such file or directory");
+            if(!file) throw f;
+            
         }
-        else if (!strcmp(msg, "shutdown"))
-        {
-            cout << "Closing..." << endl;
-            send(newSd, (char *)&msg, strlen(msg), 0);
-            break;
-        }
-        else if (strlen(msg) != 0)
-        {
-            cout << "Request:" << msg << endl;
-            strcpy(msg, FS_C.execute(msg)); // message handler
-            cout << "Response:" << msg << endl;
-            send(newSd, (char *)&msg, strlen(msg), 0); // sends response
-        }
-    }
+        // setup a socket and connection tools
+        sockaddr_in servAddr;
+        bzero((char *)&servAddr, sizeof(servAddr));
+        servAddr.sin_family = AF_INET;
+        servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        servAddr.sin_port = htons(port);
 
-    FS.disk.close();
-    close(newSd);
-    close(serverSd);
+        // open stream oriented socket with internet address
+        // also keep track of the socket descriptor
+        int serverSd = socket(AF_INET, SOCK_STREAM, 0);
+        if (serverSd < 0)
+        {
+            cerr << "Error establishing the server socket" << endl;
+            exit(0);
+        }
+
+        int bindStatus = ::bind(serverSd, (struct sockaddr *)&servAddr, sizeof(servAddr));
+
+        if (bindStatus < 0)
+        {
+            cerr << "Error binding socket to local address" << endl;
+            exit(0);
+        }
+
+        cout << "Waiting for the shell to connect..." << endl;
+        listen(serverSd, 5);
+        sockaddr_in newSockAddr;
+        socklen_t newSockAddrSize = sizeof(newSockAddr);
+        int newSd = accept(serverSd, (sockaddr *)&newSockAddr, &newSockAddrSize);
+
+        if (newSd < 0)
+        {
+            cerr << "Error accepting msg from shell!" << endl;
+            exit(1);
+        }
+
+        cout << "Connected with the shell!" << endl;
+        while (1)
+        {
+            memset(&msg, 0, sizeof(msg));              // clear the buffer
+            recv(newSd, (char *)&msg, sizeof(msg), 0); // receives message
+
+            if (!strcmp(msg, "exit"))
+            {
+                close(newSd);
+                newSd = accept(serverSd, (sockaddr *)&newSockAddr, &newSockAddrSize);
+            }
+            else if (!strcmp(msg, "shutdown"))
+            {
+                cout << "Closing..." << endl;
+                send(newSd, (char *)&msg, strlen(msg), 0);
+                break;
+            }
+            else if (strlen(msg) != 0)
+            {
+                cout << "Request:" << msg << endl;
+                strcpy(msg, FS_C.execute(msg)); // message handler
+                cout << "Response:" << msg << endl;
+                send(newSd, (char *)&msg, strlen(msg), 0); // sends response
+            }
+        }
+
+        FS.disk.close();
+        close(newSd);
+        close(serverSd);
+    }catch(string e){
+        cout<<"*\n*\n./fs: "<<e<<endl;
+    }
     return 0;
 }

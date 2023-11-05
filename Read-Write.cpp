@@ -1423,8 +1423,8 @@ int FileSystem::my_readPath(string path, int& parentInode, string& name) {
 
     while(path.length() > i) {
         currentName = "";
-        while (path[i] != '/' && path.length()+1 > i) {
-            currentName += path[i-1];
+        while (path[i] != '/' && path.length() > i) {
+            currentName += path[i];
             i++;
         }
         //cout << currentName << endl;
