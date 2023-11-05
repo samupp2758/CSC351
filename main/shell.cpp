@@ -88,14 +88,43 @@ string format_mode(string mode)
 
 //******************************************************************************
 
+string get_parent_path(string path){
+    int i = 0;
+    int dircount = 0;
+    string ans = path;
+/*
+    string ans;
+    if(path == "/"){
+        ans = path;
+    }else{
+
+    char **ss = line_splitter(path.data(), "/");
+    while(ss[i]){
+        dircount++;
+        i++;
+    }
+    for(int i = 0; i < dircount -1; i++){
+        if(ss[i]){
+			ans.append("/");
+            ans.append(ss[i]);
+		}
+		}
+    }
+    */
+    return ans;
+}
+
+//******************************************************************************
+
 // Gets the raw path passed by the user and return its absolute path
 string to_abspath(string curDir, string raw){
     int dotcounts = 0;
 	int parentcounts = 0;
     int i = 0;
 	int j = 0;
+    string ans = raw;
+/*
     string ans;
-
     if(raw.at(0) == '/'){
         //just skip to end
 	ans = raw;
@@ -138,33 +167,7 @@ string to_abspath(string curDir, string raw){
 				j++;
             }
         }
-    }
-    return ans;
-}
-
-//******************************************************************************
-
-string get_parent_path(string path){
-    int i = 0;
-    int dircount = 0;
-    string ans;
-
-    if(path == "/"){
-        ans = path;
-    }else{
-
-    char **ss = line_splitter(path.data(), "/");
-    while(ss[i]){
-        dircount++;
-        i++;
-    }
-    for(int i = 0; i < dircount -1; i++){
-        if(ss[i]){
-			ans.append("/");
-            ans.append(ss[i]);
-		}
-		}
-    }
+    }*/
     return ans;
 }
 

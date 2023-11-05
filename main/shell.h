@@ -48,8 +48,6 @@ using namespace std::chrono;
             void my_Lcp(char**input);
             void my_Icp(char**input);
 
-            string get_parent_path(string path);
-            string to_abspath(string raw);
 
             void build_ls(json callResponses, char* r);
 
