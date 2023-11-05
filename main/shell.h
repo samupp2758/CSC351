@@ -5,6 +5,7 @@
 #include <termios.h>
 #include <typeinfo>
 #include <iostream>
+#include <cstring>
 #include <string>
 #include <stdio.h>
 #include <sys/types.h>

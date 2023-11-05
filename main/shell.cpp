@@ -91,14 +91,12 @@ string format_mode(string mode)
 string get_parent_path(string path){
     int i = 0;
     int dircount = 0;
-    string ans = path;
-/*
     string ans;
     if(path == "/"){
         ans = path;
     }else{
 
-    char **ss = line_splitter(path.data(), "/");
+    char **ss = ::line_splitter((char*)path.data(), "/");
     while(ss[i]){
         dircount++;
         i++;
@@ -110,7 +108,7 @@ string get_parent_path(string path){
 		}
 		}
     }
-    */
+
     return ans;
 }
 
@@ -122,17 +120,15 @@ string to_abspath(string curDir, string raw){
 	int parentcounts = 0;
     int i = 0;
 	int j = 0;
-    string ans = raw;
-/*
     string ans;
     if(raw.at(0) == '/'){
         //just skip to end
 	ans = raw;
     } else{
         //split raw up and curDir up, then find out how many .. are included in raw
-        char **ss = ::line_splitter(raw.data(), "/");
-        char **abs = ::line_splitter(curDir.data(), "/");
-		
+        char **ss = ::line_splitter((char*)raw.data(), "/");
+        char **abs = ::line_splitter((char*)curDir.data(), "/");
+
         while(ss[i]) {
             if((strcmp(ss[i],"..")) == 0){
                 dotcounts++;
@@ -140,14 +136,12 @@ string to_abspath(string curDir, string raw){
             i++;
         }
 		
+
 		while(abs[j]) {
             parentcounts++;
             j++;
         }
-		
-        if(dotcounts >= parentcounts){ //if the number of .. is greater than the amount of directories to go up
-            ans = "/";
-        } else {
+        if(dotcounts < parentcounts){ //if the number of .. is greater than the amount of directories to go up
             //put the answer together, starting with the commonality between raw and curDir
             for(int i = 0; i < parentcounts - dotcounts; i++){
                 if(abs[i]){
@@ -155,8 +149,11 @@ string to_abspath(string curDir, string raw){
                     ans.append(abs[i]);
 				}
 			}
-	    //ans.append(ss[0]);
+            
+            
+        }
 
+	    //ans.append(ss[0]);
             //add what is different about raw to answer
 			int j = dotcounts;
             while(ss[j]){
@@ -166,8 +163,11 @@ string to_abspath(string curDir, string raw){
                 }
 				j++;
             }
-        }
-    }*/
+    }
+
+    if(ans == ""){
+        ans = "/";
+    }
     return ans;
 }
 
@@ -377,9 +377,9 @@ void Shell::my_mkdir(char **input)
             json callResponses = {{}};
             string pd = to_abspath(curDir,input[1]);
             json requestForms = {
-                {{"call", "my_readPath"},{"path",curDir}},
+                {{"call", "my_readPath"},{"path",get_parent_path(pd)}},
                 {{"call", "my_readPath"},{"path",pd}},
-                {{"call", "my_getPerm"},{"path",curDir}},
+                {{"call", "my_getPerm"},{"path",get_parent_path(pd)}},
             };
 
             //Requests all the system calls on the list
