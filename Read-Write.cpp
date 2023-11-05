@@ -1544,65 +1544,63 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 	char* temp;
 	rc = new char[nBytes];
 	int fileSize = my_Read_Size(inodeNumber);
-	if (position > fileSize || (position + nBytes) > fileSize) {
-		cerr << "start of read position plus the length of read to be read is greater than the file's size";
-		abort();
-	}
-	int* fileBlocks = get_addresses(inodeNumber,0);
-	int blockNum = position / BLOCKSIZE; //which block in the file to start with
-	int startingPos = position % BLOCKSIZE; // should the position not be in the first block
+	int start = 0;
+	int startBlock = 0;
 	int currentByte = 0;
-	if (blockNum < sizeof(fileBlocks)) {
-		temp = readBlock(fileBlocks[blockNum]);
-		for (int j = startingPos; j < BLOCKSIZE; j++) {
-			if (currentByte < nBytes) {
-				rc[currentByte] = temp[j];
-			} else {
+	int* fileBlocks;
+	int indirectBlockNumber = 0;
+	int numberOfBlocks = 0;
+
+	if (position < 0|| (position + nBytes) > fileSize) {
+		cerr << "start of read position is invalid";
+	} else {
+		
+		if (position > 0) {
+			start = position % BLOCKSIZE;
+			startBlock = (position - start) / BLOCKSIZE;
+		}
+		
+		if (startBlock > 11) { 
+			startBlock = startBlock - 12;
+			indirectBlockNumber = ((startBlock - (startBlock % 1024)) / 1024) + 1; //find starting indirect block
+			startBlock = startBlock % 1024; // mod by size of indirect block map size
+		}
+		
+		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+		
+		if (nBytes % BLOCKSIZE == 0) {
+			numberOfBlocks = nBytes / BLOCKSIZE;
+		} else {
+			numberOfBlocks = ((nBytes - (nBytes % BLOCKSIZE))/BLOCKSIZE) + 1;
+		}
+		
+		for(int i = startBlock; i < numberOfBlocks; i++) {
+			if (currentByte == nBytes) {
 				break;
 			}
-			currentByte++;
-		}
-		if (currentByte < nBytes) { // more to be read
-			blockNum++;
-			for (; blockNum < sizeof(fileBlocks);blockNum++) {
-				if (currentByte < nBytes) {
-					temp = readBlock(fileBlocks[blockNum]);
-					for (int j = 0; j < BLOCKSIZE; j++) {
-						if (currentByte < nBytes) {
-							rc[currentByte] = temp[j];
-						} else {
-							break;
-						}
-						currentByte++;
-					}
-				} else {
-					break;
+			if (indirectBlockNumber == 0) {
+				if (i > 11) {
+					numberOfBlocks = numberOfBlocks - 12;
+					i = i - 12;
+					indirectBlockNumber++;
+					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+				}
+			} else if (indirectBlockNumber > 0) {
+				if (i > 1024) {
+					numberOfBlocks = numberOfBlocks - 1024;
+					i = i - 1024;
+					indirectBlockNumber++;
+					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			}
-		}
-	}
-	// if the file has more than sizeof(fileBlocks) blocks and still more to be read 
-	if (fileSize > (BLOCKSIZE *(sizeof(fileBlocks))) + 1 && (currentByte < nBytes)) {
-		delete fileBlocks;
-		blockNum = 0; // set to 0 to make fileBlocks[] easier 
-		int* fileBlocks = get_addresses(inodeNumber, 1);
-		
-		if (currentByte == 0) {
-			for (int j = startingPos; j < BLOCKSIZE; j++) {
-				if (currentByte < nBytes) {
-					rc[currentByte] = temp[j];
-				} else {
-					break;
-				}
-				currentByte++;
+			if (fileBlocks[i] == 0) {
+				cerr << "no block alocated" << endl;
+				break;
 			}
-			blockNum++;
-		}
-		
-		for (; blockNum < sizeof(fileBlocks);blockNum++) {
-			if (currentByte < nBytes) {
-				temp = readBlock(fileBlocks[blockNum]);
-				for (int j = 0; j < BLOCKSIZE; j++) {
+			temp = readBlock(fileBlocks[i]);
+			
+			if (i == startBlock) {
+				for (int j = start; j < BLOCKSIZE; j++) {
 					if (currentByte < nBytes) {
 						rc[currentByte] = temp[j];
 					} else {
@@ -1611,11 +1609,18 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 					currentByte++;
 				}
 			} else {
-				break;
+				for (int j = 0; j < BLOCKSIZE; j++) {
+					if (currentByte < nBytes) {
+						rc[currentByte] = temp[j];
+					} else {
+						break;
+					}
+					currentByte++;
+				}
 			}
-		}
+			
+		}	
 	}
-	
 	delete temp, fileBlocks;
 	return rc;
 }
