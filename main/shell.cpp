@@ -90,50 +90,68 @@ string format_mode(string mode)
 
 // Gets the raw path passed by the user and return its absolute path
 string Shell::to_abspath(string raw){
-    int parentcounts = 0;
+    int dotcounts = 0;
+	int parentcounts = 0;
     int i = 0;
-    string ans = raw;
+	int j = 0;
+    string ans;
 
-    if(raw == "/"){
+    if(raw.at(0) == '/'){
         //just skip to end
+	ans = raw;
     } else{
-        //split raw up and curDir up, then find out how many '..' are included in raw
-        char **ss = line_splitter(&raw[0], "/");
-        char **abs = line_splitter(&curDir[0], "/");
-        while(i < sizeof(ss)) {
-            if(strcmp(ss[i],"..")){
-                parentcounts++;
+        //split raw up and curDir up, then find out how many .. are included in raw
+        char **ss = line_splitter(raw.data(), "/");
+        char **abs = line_splitter(curDir.data(), "/");
+		
+        while(ss[i]) {
+            if((strcmp(ss[i],"..")) == 0){
+                dotcounts++;
             }
             i++;
         }
-
-        if(parentcounts <= sizeof(abs)){ //if the number is .. is greater than the amount of directories to go up
+		
+		while(abs[j]) {
+            parentcounts++;
+            j++;
+        }
+		//parentcounts = parentcounts - dotcounts;
+		
+		cout << dotcounts << endl;
+		cout << parentcounts << endl;
+		
+        if(dotcounts >= parentcounts){ //if the number of .. is greater than the amount of directories to go up
             ans = "/";
         } else {
             //put the answer together, starting with the commonality between raw and curDir
-            for(int i = 0; i < sizeof(abs - parentcounts); i++){
-                ans.append("/");
-                ans.append(abs[i]);
+            for(int i = 0; i < parentcounts - dotcounts; i++){
+                if(abs[i]){
+		    ans.append("/");
+                    ans.append(abs[i]);
+		}
             }
+	    //ans.append(ss[0]);
+	    cout << "cur ans is " << ans << endl;
+
             //add what is different about raw to answer
-            for(int i = parentcounts; i < sizeof(ss); i++){
-                if(ss[i] != "."){
+			int j = dotcounts;
+            while(ss[j]){
+                if(ss[j] != "."){
                     ans.append("/");
-                    ans.append(ss[i]);
+                    ans.append(ss[j]);
                 }
+				j++;
             }
         }
     }
-
     return ans;
 }
 
 //******************************************************************************
 
 string Shell::get_parent_path(string path){
-    char **ss = line_splitter(&path[0], "/");
-    int count = 0;
-    return path;
+    string ans = to_abspath("..");
+    return ans;
 }
 
 char *Shell::request(json req_json)
