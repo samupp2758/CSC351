@@ -23,6 +23,7 @@
 #include "./utils/bits/stdc++.h"
 #include "./utils/json.hpp"
 #include <set>
+#include<sstream>
 using json = nlohmann::json;
 using namespace std;
 using namespace std::chrono;

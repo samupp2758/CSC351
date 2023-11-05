@@ -236,14 +236,80 @@ void Shell::build_ls(json callResponses,char* r){
     }
 }
 
+//******************************************************************************
+
 void Shell::my_ls(char **input)
 {
+    string help = "usage: ls path/to/directory";
     char *r; //Request
     json r_j;
     json p_r;
     bool rc = false;
+    string pd;
     json callResponses = {{}};
-    string pd = (input[1] ? to_abspath(input[1]) : curDir);
+    json requestForms = {
+        {{"call", "my_readPath"}},
+        {{"call", "my_getPerm"}},
+    };
+
+    try{   
+        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }else{
+            pd = (input[1] ? to_abspath(input[1]) : curDir);
+        }
+
+        if(input[2]){
+            throw "Too many arguments!";
+        }
+
+        //Requests all the system calls on the list
+        for (int i = 0; i < requestForms.size(); i++){
+            requestForms[i]["path"] = pd;
+            r = request(requestForms[i]);
+            callResponses[i] = json::parse((string)r);
+        }
+
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            string g = requestForms[0]["path"];
+            g.append(": No such file or directory");
+            throw g;
+        }
+        //Verifies if the user has permission to ls
+        switch (int(callResponses[1]["permission"]))
+        {
+        case 4:/* r-- */rc = true;break;
+        case 5:/* r-x */rc = true;break;
+        case 6:/* rw- */rc = true;break;
+        case 7:/* rwx */rc = true;break;
+        default:
+            string g = requestForms[0]["path"];
+            g.append(": Permission denied");
+            throw g;
+            break;
+        }
+        /*If the directory exists and the user has permissions to see it,
+        Builds the ls output by calling all data from all files in the dir*/
+        if (rc) build_ls(callResponses,r);
+        
+    }catch(string e){
+        cout<<"ls: "<<e<<endl;
+    }
+}
+
+//******************************************************************************
+
+void Shell::my_cd(char **input)
+{    
+
+    string help = "usage: cd path/to/directory";
+    char *r; //Request
+    json r_j;
+    json p_r;
+    string pd;
+    bool rc = false;
+    json callResponses = {{}};
     json requestForms = {
         {{"call", "my_readPath"}},
         {{"call", "my_getPerm"}},
@@ -251,8 +317,10 @@ void Shell::my_ls(char **input)
 
     try{
 
-        if(input[2]){
-            throw("Too many arguments!");
+        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }else{
+            pd = (input[1] ? to_abspath(input[1]) : "/");
         }
 
         //Requests all the system calls on the list
@@ -264,57 +332,11 @@ void Shell::my_ls(char **input)
 
         //Verifies if the path exists
         if(callResponses[0]["inodeNumber"] == -1){
-            throw("No such file or directory");
+            string g = pd;
+            g.append(": No such file or directory");
+            throw g;
         }
-            //Verifies if the user has permission to ls
-            switch (int(callResponses[1]["permission"]))
-            {
-            case 4:/* r-- */rc = true;break;
-            case 5:/* r-x */rc = true;break;
-            case 6:/* rw- */rc = true;break;
-            case 7:/* rwx */rc = true;break;
-            default:
-                throw "Permission denied";
-                break;
-            }
 
-            /*If the directory exists and the user has permissions to see it,
-            Builds the ls output by calling all data from all files in the dir*/
-            if (rc) build_ls(callResponses,r);
-        }catch(const char* e){
-            cout<<"ls: "<<pd<<": "<<e<<endl;
-        }
-}
-
-//******************************************************************************
-
-void Shell::my_cd(char **input)
-{
-    char *r; //Request
-    json r_j;
-    json p_r;
-    bool rc = false;
-    json callResponses = {{}};
-    string pd = (input[1] ? to_abspath(input[1]) : curDir);
-    json requestForms = {
-        {{"call", "my_readPath"}},
-        {{"call", "my_getPerm"}},
-    };
-
-    //Requests all the system calls on the list
-    for (int i = 0; i < requestForms.size(); i++){
-        requestForms[i]["path"] = pd;
-        r = request(requestForms[i]);
-        callResponses[i] = json::parse((string)r);
-    }
-
-    //Verifies if the path exists
-    if(callResponses[0]["inodeNumber"] == -1){
-        string d = "ls: ";
-        d.append(pd);
-        d.append(": No such file or directory");
-        cout << d << endl;
-    }else{
         //Verifies if the user has permission to ls
         switch (int(callResponses[1]["permission"]))
         {
@@ -322,15 +344,17 @@ void Shell::my_cd(char **input)
         case 5:/* r-x */rc = true;break;
         case 7:/* rwx */rc = true;break;
         default:
-            string d = "ls: access denied: ";
-            d.append(pd);
-            cout << d << endl;
+            string g = pd;
+            g.append(": Permission denied");
+            throw g;
             break;
         }
-
         /*If the directory exists and the user has permissions to see it,
         Builds the ls output by calling all data from all files in the dir*/
         if (rc) curDir = pd;
+
+    }catch(string e){
+        cout<<"cd: "<<e<<endl;
     }
 }
 
@@ -338,12 +362,88 @@ void Shell::my_cd(char **input)
 
 void Shell::my_mkdir(char **input)
 {
-    //Verify if the input[1] is empty
-    if(input[1] && !input[2]){
-        char *r; //Request
+    string help = "usage: mkdir path/to/directory";
+    try{
+        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }
+        //Verify if the input[1] is empty
+        if(input[1] && !input[2]){
+            char *r; //Request
+            bool rc = false;
+            json callResponses = {{}};
+            string pd = to_abspath(input[1]);
+            json requestForms = {
+                {{"call", "my_readPath"},{"path",curDir}},
+                {{"call", "my_readPath"},{"path",pd}},
+                {{"call", "my_getPerm"},{"path",curDir}},
+            };
+
+            //Requests all the system calls on the list
+            for (int i = 0; i < requestForms.size(); i++){
+                r = request(requestForms[i]);
+                callResponses[i] = json::parse((string)r);
+            }
+
+            //Verifies if the path exists
+            if(callResponses[0]["inodeNumber"] == -1){
+                string g = requestForms[0]["path"];
+                g.append(": No such file or directory");
+                throw g;
+            }
+
+            if(callResponses[1]["inodeNumber"] != -1){
+                string g = requestForms[1]["path"];
+                g.append(": File exists");
+                throw g;
+            }
+                
+            switch (int(callResponses[2]["permission"]))
+                {
+                case 7:/* rwx */rc = true;break;
+                default:
+                    string g = requestForms[0]["path"];
+                    g.append(": Permission denied");
+                    throw g;
+                    break;
+                }
+
+            json requestForm = {
+                {"call", "my_mkdir"},
+                {"path", pd}};
+            r = request(requestForm);
+
+        }else if(input[2]){
+            throw "too many arguments!";
+        }else{
+            throw help;
+        }
+    }catch(string e){
+            cout<<"mkdir: "<<e<<endl;
+    }
+}
+
+//******************************************************************************
+
+void Shell::my_Lcp(char **input)
+{
+    string help = "usage: Lcp filesystem/source machine/destination";
+    bool rc = false;
+    char* r;
+    char buff[3000];
+    json callResponses = {{}};
+    
+    try{
+
+        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }
+        // check permission that you are able to access that file
         bool rc = false;
+        char* r;
+        char buff[3000];
         json callResponses = {{}};
-        string pd = get_parent_path(to_abspath(input[1]));
+        string pd = (input[1] ? to_abspath(input[1]) : curDir);
         json requestForms = {
             {{"call", "my_readPath"}},
             {{"call", "my_getPerm"}},
@@ -356,138 +456,122 @@ void Shell::my_mkdir(char **input)
             callResponses[i] = json::parse((string)r);
         }
 
-        //Verifies if the path exists
-        if(callResponses[0]["inodeNumber"] == -1){
-            string d = "ls: ";
-            d.append(pd);
-            d.append(": No such file or directory");
-            cout << d << endl;
-        }else{
-            switch (int(callResponses[1]["permission"]))
-                {
-                case 7:/* rwx */rc = true;break;
-                default:
-                    string d = "mkdir: permission denied: ";
-                    d.append(pd);
-                    cout << d << endl;
-                    break;
-                }
+        switch (int(callResponses[1]["permission"]))
+            {
+            case 4:/* r-- */rc = true;break;
+            case 5:/* r-x */rc = true;break;
+            case 6:/* rw- */rc = true;break;
+            case 7:/* rwx */rc = true;break;
+            default:
+                string d = "ls: permission denied: ";
+                d.append(pd);
+                cout << d << endl;
+                break;
+            }
 
-            json requestForm = {
-                {"call", "my_mkdir"},
-                {"path", input[1]}};
-            char *r = request(requestForm);
+        if(rc){
+            // create the target file on the host system using the same name
+            ofstream myfile;
+            myfile.open (input[1]);
+
+            // Copy the file to the buffer, making multiple calls if necessary, then writing the buffer to the file
+            while(callResponses[2]["buff"] != -1){
+
+            }
+            myfile.close();
         }
-    }else if(input[2]){
-        cout << "mkdir: too many arguments!" << endl;
-    }else{
-        cout << "usage: mkdir directory_name" << endl;
-    }
-}
-
-//******************************************************************************
-
-void Shell::my_Lcp(char **input)
-{
-    // check permission that you are able to access that file
-    bool rc = false;
-    char* r;
-    char buff[3000];
-    json callResponses = {{}};
-        string pd = (input[1] ? to_abspath(input[1]) : curDir);
-        json requestForms = {
-            {{"call", "my_readPath"}},
-            {{"call", "my_getPerm"}},
-            {{"call", "my_read"}},
-        };
-
-    //Requests all the system calls on the list
-    for (int i = 0; i < requestForms.size(); i++){
-        requestForms[i]["path"] = pd;
-        r = request(requestForms[i]);
-        callResponses[i] = json::parse((string)r);
-    }
-
-    switch (int(callResponses[1]["permission"]))
-        {
-        case 4:/* r-- */rc = true;break;
-        case 5:/* r-x */rc = true;break;
-        case 6:/* rw- */rc = true;break;
-        case 7:/* rwx */rc = true;break;
-        default:
-            string d = "ls: access denied: ";
-            d.append(pd);
-            cout << d << endl;
-            break;
-        }
-    
-    if(rc){
-        // create the target file on the host system using the same name
-        ofstream myfile;
-        myfile.open (input[1]);
-
-        // Copy the file to the buffer, making multiple calls if necessary, then writing the buffer to the file
-        while(callResponses[2]["buff"] != -1){
-
-        }
-        myfile.close();
+    }catch(string e){
+        cout<<"Icp: "<<e<<endl;
     }
 }
 
 //******************************************************************************
 
 void Shell::my_Icp(char **input)
-{
+{   
+    string help = "usage: Icp machine/source filesystem/destination";
     bool rc = false;
     char* r;
     char buff[3000];
     json callResponses = {{}};
-        string pd = (input[1] ? to_abspath(input[1]) : curDir);
+    
+    try{
+
+        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }
+
+        if(!input[2]){
+            throw "missing destination!";
+        }
+
+        if(!input[1]){
+            throw "missing source!";
+        }
+
+        if(!input[3]){
+            throw "too many arguments!";
+        }
+
         json requestForms = {
             {{"call", "my_readPath"}},
             {{"call", "my_getPerm"}},
         };
+        string pd = to_abspath(input[2]);
 
-    //Requests all the system calls on the list
-    for (int i = 0; i < requestForms.size(); i++){
-        requestForms[i]["path"] = pd;
-        r = request(requestForms[i]);
-        callResponses[i] = json::parse((string)r);
-    }
-    
-    //checks permission
-    switch (int(callResponses[1]["permission"]))
-        {
-        case 2:/* -w- */rc = true;break;
-        case 3:/* -wx */rc = true;break;
-        case 6:/* rw- */rc = true;break;
-        case 7:/* rwx */rc = true;break;
-        default:
-            string d = "ls: access denied: ";
-            d.append(pd);
-            cout << d << endl;
-            break;
-        }
-        
-    if(rc){
-        // open the file on the underlying filesystem
-        ofstream myfile;
-        myfile.open (input[1]);
-        if(myfile.is_open()){
-
-            // make the local file
-            for (int i = 0; i < requestForms.size(); i++){
+        //Requests all the system calls on the list
+        for (int i = 0; i < requestForms.size(); i++){
             requestForms[i]["path"] = pd;
             r = request(requestForms[i]);
             callResponses[i] = json::parse((string)r);
         }
-            // lseek to the beginning of the file on the host system
 
-            // put the blocks in a buffer, then read those to the local file
-            myfile.close();
-        } else {
-            cout << "Unable to open file on underlying directory" << endl;
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            string g = pd;
+            g.append(": No such file or directory");
+            throw g;
         }
+
+        //Verifies if the user has permission to ls
+        switch (int(callResponses[1]["permission"]))
+        {
+        case 2:/* -w- */rc = true;break;
+        case 3:/* -wx */rc = true;break;
+        default:
+            string g = pd;
+            g.append(": Permission denied");
+            throw g;
+            break;
+        }
+
+    
+        if(rc){
+            // open the file on the underlying filesystem
+            ofstream myfile;
+            myfile.open (input[1]);
+            if(myfile.is_open()){
+                string buffer = "";
+                ifstream f("a.txt");
+                string str;
+                if(f) {
+                    ostringstream ss;
+                    ss << f.rdbuf();
+                    str = ss.str();
+                }
+                //
+
+                // lseek to the beginning of the file on the host system
+
+                // put the blocks in a buffer, then read those to the local file
+                myfile.close();
+            } else {
+                throw "Unable to open file on underlying directory";
+            }
+        }
+
+    }catch(string e){
+            cout<<"Icp: "<<e<<endl;
     }
 
 }
