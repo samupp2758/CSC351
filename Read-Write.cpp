@@ -1606,14 +1606,13 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 			}
 			if (indirectBlockNumber == 0) {
 				if (i > 11) {
-					numberOfBlocks = numberOfBlocks - 12;
-					i = i - 12;
+					numberOfBlocks = (((nBytes - currentByte) - ((nBytes - currentByte) % BLOCKSIZE))/BLOCKSIZE) + 1;					i = i - 12;
 					indirectBlockNumber++;
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			} else if (indirectBlockNumber > 0) {
 				if (i > 1024) {
-					numberOfBlocks = numberOfBlocks - 1024;
+					numberOfBlocks = (((nBytes - currentByte) - ((nBytes - currentByte) % BLOCKSIZE))/BLOCKSIZE) + 1;					i = i - 12;
 					i = i - 1024;
 					indirectBlockNumber++;
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
