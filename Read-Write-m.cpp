@@ -24,22 +24,92 @@ int main() {
     //cout << result[0] << " " << result[1];
     char* buffer = new char[4096];
     FS.Create_New_FS("disk.dat");
-    FS.my_mkdir("/directory", 15, 15);
-    FS.my_mkdir("/pictures", 15, 15);
-    FS.my_mkdir("/directory/peeps", 15, 15);
+    int dirInode = FS.my_mkdir("/directory", 15, 15);
+
+    fstream file;
+    //file.open("PH1_Design_Document.txt");
+    
+    
+    file.open("PH1_Design_Document-Copy.txt"); 
+    file.seekg(0, ios::end);
+    int length = file.tellg();
+    file.seekg(0, ios::beg);
+    char* fileData = new char[length];
+    file.read(fileData, length);
+    file.close();
+
+    char mode[] = {63, 224};
+    int inodeNumber = FS.create_inode(mode, 1, 1);
+    FS.my_write_dir(dirInode, inodeNumber, "text");
+    FS.my_Write(inodeNumber, 0, length, fileData);
+    
+    /*
+    
+    FS.my_extend(inodeNumber);
+    FS.my_extend(inodeNumber);
+    FS.my_extend(inodeNumber);
+    FS.my_extend(inodeNumber);
+    FS.my_extend(inodeNumber);
+    FS.my_extend(inodeNumber);
+
+    cout << endl;
+    cout << endl;
+
+    int* addresses = FS.get_addresses(inodeNumber, 1);
+    for (int i = 0; i< 1024; i++) {
+        cout << addresses[i] << " ";
+    }
+    
+    */
+
+    cerr << "time to read" << endl;
+    
+    /*
+    char* result = FS.my_Read(inodeNumber, 0, length);
+    //cerr << "ran" << endl;
+    file.open("ResultsDoc.txt", ios::out | ios::binary);
+    file.write(result, length);
+    file.close();
+    */
+
+    /*
+    cout << endl;
+    for (int i = 0; i < length; i++) {
+        cout << result[i];
+    }
+    cout << endl;
+    */
+    
+
+
+    //FS.my_mkdir("/pictures", 15, 15);
+    //FS.my_mkdir("/directory/peeps", 15, 15);
     //FS.my_mkdir("/apples", 15, 15);
 
-    FS.print_dir("/directory");
+    //FS.print_dir("/directory");
+    
+    
     //FS.my_rmdir("/pictures");
     //FS.my_rmdir("/directory");
-    FS.my_rmdir("/directory/peeps");
-    FS.print_dir("/directory");
+    //FS.my_rmdir("/directory/peeps");
+    //FS.print_dir("/directory");
 
     
+    /*
     for (int i = 0; i < 4096; i++) {
         buffer[i] = 'A';
     }
-    //FS.writeBlock(1042, buffer);
+    FS.writeBlock(1066, buffer);
+
+    FS.writeBlock(1068, buffer);
+    FS.writeBlock(1069, buffer);
+    FS.writeBlock(1070, buffer);
+    FS.writeBlock(1071, buffer);
+    FS.writeBlock(1072, buffer);
+    FS.writeBlock(1073, buffer);
+    */
+
+
     /*
     int nums[83];
     for(int i = 0; i < 83; i++) {
