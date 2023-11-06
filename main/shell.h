@@ -25,9 +25,9 @@
 #include "./utils/json.hpp"
 #include <set>
 #include<sstream>
+#include <filesystem>
 using json = nlohmann::json;
 using namespace std;
-using namespace std::chrono;
 
 
     class Shell{
@@ -40,25 +40,19 @@ using namespace std::chrono;
             int clientSd;
             json user;
             string curDir;
-            string *history;
-            char *request(json req_json);
+            string *history; //Todo
+            char *request(json req_json,char* buffer = NULL);
             void execute(string data);
             void my_ls(char**input);
             void my_cd(char**input);
             void my_mkdir(char**input);
             void my_Lcp(char**input);
             void my_Icp(char**input);
+            void my_cat(char **input);
 
 
             void build_ls(json callResponses, char* r);
 
-            void chdir();
-            void opendir();
-            void closedir();
-            void rewinddir();
-            void open();
-            void close();
-            void lseek();
     };
 
 #endif

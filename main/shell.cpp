@@ -171,7 +171,7 @@ string to_abspath(string curDir, string raw){
     return ans;
 }
 
-char *Shell::request(json req_json)
+char *Shell::request(json req_json, char* buffer)
 {
     char req[4096];
     req_json["user"] = user;
@@ -180,7 +180,18 @@ char *Shell::request(json req_json)
     strcpy(req, req_.c_str());
     send(clientSd, (char *)&req, strlen(req), 0);
     memset(&req, 0, sizeof(req)); // clear the buffer
+
+                    cout<<req_json<<endl;
     recv(clientSd, (char *)&req, sizeof(req), 0);
+
+    if(buffer != NULL){
+        memset(&req, 0, sizeof(req)); // clear the buffer
+        strcpy(req, buffer);
+        send(clientSd, (char *)&req, strlen(req), 0);
+        memset(&req, 0, sizeof(req)); // clear the buffer
+        recv(clientSd, (char *)&req, sizeof(req), 0);
+    }
+
     return strcat(req, "");
 }
 
@@ -260,10 +271,12 @@ void Shell::my_ls(char **input)
             throw help;
         }else{
             pd = (input[1] ? to_abspath(curDir,input[1]) : curDir);
-        }
+        } 
 
         if(input[2]){
-            throw "Too many arguments!";
+            string g = "";
+            g.append("Too many arguments!");
+            throw g;
         }
 
         //Requests all the system calls on the list
@@ -279,7 +292,7 @@ void Shell::my_ls(char **input)
             g.append(": No such file or directory");
             throw g;
         }
-        //Verifies if the user has permission to ls
+        //Verifies if the user has permission to ls (just needs read)
         switch (int(callResponses[1]["permission"]))
         {
         case 4:/* r-- */rc = true;break;
@@ -340,7 +353,7 @@ void Shell::my_cd(char **input)
             throw g;
         }
 
-        //Verifies if the user has permission to ls
+        //Verifies if the user has permission to cd (just needs execute)
         switch (int(callResponses[1]["permission"]))
         {
         case 3:/* -wx */rc = true;break;
@@ -401,8 +414,12 @@ void Shell::my_mkdir(char **input)
                 throw g;
             }
                 
+            //Check permissions for mkdir (just needs write)
             switch (int(callResponses[2]["permission"]))
                 {
+                case 2:/* -w- */rc = true;break;
+                case 3:/* -wx */rc = true;break;
+                case 6:/* rw- */rc = true;break;
                 case 7:/* rwx */rc = true;break;
                 default:
                     string g = requestForms[0]["path"];
@@ -438,15 +455,14 @@ void Shell::my_Lcp(char **input)
     
     try{
 
-        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+        if(input[3] || !input[2] || !input[1] || input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
             throw help;
         }
         // check permission that you are able to access that file
         bool rc = false;
         char* r;
-        char buff[3000];
         json callResponses = {{}};
-        string pd = (input[1] ? to_abspath(curDir,input[1]) : curDir);
+        string pd = to_abspath(curDir,input[1]);
         json requestForms = {
             {{"call", "my_readPath"}},
             {{"call", "my_getPerm"}},
@@ -468,20 +484,55 @@ void Shell::my_Lcp(char **input)
             default:
                 string d = "ls: permission denied: ";
                 d.append(pd);
-                cout << d << endl;
+                throw d;
                 break;
             }
+        
+
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            string g = pd;
+            g.append(": No such file or directory");
+            throw g;
+        }
 
         if(rc){
-            // create the target file on the host system using the same name
-            ofstream myfile;
-            myfile.open (input[1]);
-
-            // Copy the file to the buffer, making multiple calls if necessary, then writing the buffer to the file
-            while(callResponses[2]["buff"] != -1){
-
+            //Opens the file on the machine
+            char curDir_m[3000];
+            getcwd(curDir_m, 3000);
+            string path = to_abspath(curDir_m,input[1]);
+            ofstream dest_f (path);
+            if(dest_f.is_open()){
+                //Gets the size of the file
+                json req = {{"call", "my_Read_Size"},
+                {"inodeNumber",callResponses[0]["inodeNumber"]}};
+                char* size_res = request(req);
+                json size_res_json = json::parse((string)size_res);
+                
+                int count = 0;
+                int buffer_s = ((size_res_json["size"] < 4096) ? int(size_res_json["size"]) : 4096);
+                string final_ = "";
+                while(1){
+                    json req = {{"call", "my_read"},
+                    {"inodeNumber",callResponses[0]["inodeNumber"]},
+                    {"size",buffer_s},
+                    {"position",count}};
+                    char* my_read_res = request(req);
+                    if(my_read_res != (char*)-1){
+                        count += buffer_s;
+                        final_.append(my_read_res);
+                    }else{
+                        break;
+                    }
+                    cout<<count<<endl;
+                }
+                dest_f.close();
+                //while loop calling my_read
+                //closes file on the machine
+            }else{
+                string g = "No such a file or directory";
+                throw g;
             }
-            myfile.close();
         }
     }catch(string e){
         cout<<"Icp: "<<e<<endl;
@@ -490,30 +541,20 @@ void Shell::my_Lcp(char **input)
 
 //******************************************************************************
 
+void Shell::my_cat(char **input){}
+
+//******************************************************************************
+
 void Shell::my_Icp(char **input)
 {   
     string help = "usage: Icp machine/source filesystem/destination";
     bool rc = false;
     char* r;
-    char buff[3000];
     json callResponses = {{}};
     
     try{
-
-        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+        if(input[3] || !input[2] || !input[1] || input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
             throw help;
-        }
-
-        if(!input[2]){
-            throw "missing destination!";
-        }
-
-        if(!input[1]){
-            throw "missing source!";
-        }
-
-        if(!input[3]){
-            throw "too many arguments!";
         }
 
         json requestForms = {
@@ -541,6 +582,7 @@ void Shell::my_Icp(char **input)
         {
         case 2:/* -w- */rc = true;break;
         case 3:/* -wx */rc = true;break;
+        case 7:/* rwx */rc = true;break;
         default:
             string g = pd;
             g.append(": Permission denied");
@@ -550,27 +592,98 @@ void Shell::my_Icp(char **input)
 
     
         if(rc){
-            // open the file on the underlying filesystem
-            ofstream myfile;
-            myfile.open (input[1]);
-            if(myfile.is_open()){
-                string buffer = "";
-                ifstream f("a.txt");
-                string str;
-                if(f) {
-                    ostringstream ss;
-                    ss << f.rdbuf();
-                    str = ss.str();
+            string buffer = "";
+            ifstream f(input[1]);
+            if(f) { //File exists!
+                //Put in a buffer, and does requests to send the file
+
+                ostringstream ss;
+                ss << f.rdbuf();
+                buffer = ss.str();
+
+                //Gets the name of the file by creating the absolute path to it
+                //Then getting the very last position of the line_splitter "/"
+                char curDir_m[3000];
+                getcwd(curDir_m, 3000);
+                string path = to_abspath(curDir_m,input[1]);
+                char **abs = ::line_splitter((char*)path.data(), "/");
+
+                string filename;
+                int j = 0;
+		        while(abs[j]) {
+                    filename = abs[j];
+                    j++;
                 }
+
+                path = "";
+                path.append(to_abspath(curDir,input[2]));
+                path.append(filename);
+
+///                json requestForm = {{"call", "my_readPath"},{"path",path}};
+//                r = request(requestForm);
+//                json my_verify_res = json::parse((string)r);
+
+                json requestForm = {{"call", "my_create"},{"path",path}};
+                r = request(requestForm);
+                json my_create_res = json::parse((string)r);
+
+                if(my_create_res["inodeNumber"] <= 0){
+                    string g = "";
+                    g.append("Error while trying to import the file");
+                    throw g;
+                }
+
+                char* buffer_whole = (char*)buffer.c_str();
+                int file_size= 0;
+                while(buffer_whole[file_size])file_size++;
+
+
+                int buf_size = 4096;
+                int count = 0;
+                while(1){
+                    if(count >= file_size){
+                        break;
+                    }
+
+                    string buffer_temp = buffer.substr(count,buf_size-1);
+                    char* buffer_piece = (char*)buffer_temp.c_str();
+
+                    json requestForm = {{"call", "my_write"},
+                    {"position",count},
+                    {"size",file_size},
+                    {"inodeNumber",my_create_res["inodeNumber"]}};
+
+                    r = request(requestForm,buffer_piece);
+
+                    json my_write_res = json::parse((string)r);
+
+                    if(my_write_res["status"] == 1){
+                        count += buf_size;
+                        rc = true;
+                    }else{
+                        rc = false;
+                        break;
+                    }
+                }
+
+                if(rc){
+                    cout<<"Success! File "<<filename<<endl;
+                }else{
+                    string g = "File NOT created :(";
+                    throw g;
+                }
+
+            }else{
+                string g = "";
+                g.append("No such file or directory");
+                throw g;
+            }
                 //
 
                 // lseek to the beginning of the file on the host system
 
                 // put the blocks in a buffer, then read those to the local file
-                myfile.close();
-            } else {
-                throw "Unable to open file on underlying directory";
-            }
+
         }
 
     }catch(string e){

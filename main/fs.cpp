@@ -23,132 +23,177 @@ using namespace std;
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
-char *FS_CONNECTOR::execute(string msg)
+char *FS_CONNECTOR::execute(string msg, int clientSd)
 {
     FileSystem FS(this->file_name);
     json response;
     string res = "";
     if (strcmp(&msg[0], "exit"))
-    {
-        json request = json::parse(msg);
-        response["call"] = request["call"];
+    {   
+            if(writing){
+                char* str = (char*)msg.c_str();
+                str[strlen(str)] = '\0';
+                response["call"] = "my_write";
+                response["status"] =  int(FS.my_Write(file_descriptor[2],
+                file_descriptor[0],
+                file_descriptor[1],str));
 
-        if (request["call"] == "my_getPerm")
-        {
-            response["permission"] = FS.my_getPerm(
-            std::string(request["path"]),
-            request["user"]["UID"],
-            request["user"]["GID"]);
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_readPath")
-        {
-            response["inodeNumber"] = FS.my_readPath(request["path"]);
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_Read_Size")
-        {
-            response["size"] = FS.my_Read_Size(request["inodeNumber"]);
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_read_dir")
-        {
-            int inodenumber;
-            string name;
-            char type;
-            int nextPos = FS.my_read_dir(
-                request["inodeNumber"],
-                request["position"],
-                inodenumber,
-                name,
-                type);
-            response["nextPos"] = nextPos;
-            response["inodeNumber"] = inodenumber;
-            response["type"] = type;
-            response["name"] = name;
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_Read_Mode")
-        {   
-            char*mode = FS.my_Read_Mode((int)request["inodeNumber"]);
+                file_descriptor[0] = -1;
+                file_descriptor[1] = -1;
+                file_descriptor[2] = -1;
+                writing = false;
 
-            bool* bool_0= FS.character_To_Binary(mode[0]); //Perms
-            bool* bool_1= FS.character_To_Binary(mode[1]); //Type
-            int _0 = FS.characters_To_Integer(mode);
-            
-            string type = "";
-            string permissions = "";
+                res = response.dump();
 
-            type.append(to_string(int(bool_0[0])));
-            type.append(to_string(int(bool_0[1])));
-            permissions.append(to_string(int(bool_0[2])));
-            permissions.append(to_string(int(bool_0[3])));
-            permissions.append(to_string(int(bool_0[4])));
-            permissions.append(to_string(int(bool_0[5])));
-            permissions.append(to_string(int(bool_0[6])));
-            permissions.append(to_string(int(bool_0[7])));
+            }else{
 
-            permissions.append(to_string(int(bool_1[0])));
-            permissions.append(to_string(int(bool_1[1])));
-            permissions.append(to_string(int(bool_1[2])));
+            json request = json::parse(msg);
+            response["call"] = request["call"];
 
-            type.append(permissions);
-            response["mode"] = type;
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_Read_nlinks")
-        {
-            response["nlinks"] = FS.my_Read_nlinks(request["inodeNumber"]);
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_Read_UID")
-        {
-            response["UID"] = FS.my_Read_UID(request["inodeNumber"]);
-            //************s******************************************************************
-        }
-        else if (request["call"] == "my_Read_GID")
-        {
-            response["GID"] = FS.my_Read_GID(request["inodeNumber"]);
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_Read_MTime")
-        {
-            response["MTime"] = FS.my_Read_MTime(request["inodeNumber"]);
-            //******************************************************************************
-        }
-        else if (request["call"] == "my_mkdir")
-        {
-            response["status"] = FS.my_mkdir(
-                request["path"],
+            if (request["call"] == "my_getPerm")
+            {
+                response["permission"] = FS.my_getPerm(
+                std::string(request["path"]),
                 request["user"]["UID"],
                 request["user"]["GID"]);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_readPath")
+            {
+                response["inodeNumber"] = FS.my_readPath(request["path"]);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_Read_Size")
+            {
+                response["size"] = FS.my_Read_Size(request["inodeNumber"]);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_read_dir")
+            {
+                int inodenumber;
+                string name;
+                char type;
+                int nextPos = FS.my_read_dir(
+                    request["inodeNumber"],
+                    request["position"],
+                    inodenumber,
+                    name,
+                    type);
+                response["nextPos"] = nextPos;
+                response["inodeNumber"] = inodenumber;
+                response["type"] = type;
+                response["name"] = name;
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_Read_Mode")
+            {   
+                char*mode = FS.my_Read_Mode((int)request["inodeNumber"]);
 
-            response["what"] = request["path"];
-            //******************************************************************************
+                bool* bool_0= FS.character_To_Binary(mode[0]); //Perms
+                bool* bool_1= FS.character_To_Binary(mode[1]); //Type
+                int _0 = FS.characters_To_Integer(mode);
+                
+                string type = "";
+                string permissions = "";
+
+                type.append(to_string(int(bool_0[0])));
+                type.append(to_string(int(bool_0[1])));
+                permissions.append(to_string(int(bool_0[2])));
+                permissions.append(to_string(int(bool_0[3])));
+                permissions.append(to_string(int(bool_0[4])));
+                permissions.append(to_string(int(bool_0[5])));
+                permissions.append(to_string(int(bool_0[6])));
+                permissions.append(to_string(int(bool_0[7])));
+
+                permissions.append(to_string(int(bool_1[0])));
+                permissions.append(to_string(int(bool_1[1])));
+                permissions.append(to_string(int(bool_1[2])));
+
+                type.append(permissions);
+                response["mode"] = type;
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_Read_nlinks")
+            {
+                response["nlinks"] = FS.my_Read_nlinks(request["inodeNumber"]);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_Read_UID")
+            {
+                response["UID"] = FS.my_Read_UID(request["inodeNumber"]);
+                //************s******************************************************************
+            }
+            else if (request["call"] == "my_Read_GID")
+            {
+                response["GID"] = FS.my_Read_GID(request["inodeNumber"]);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_Read_MTime")
+            {
+                response["MTime"] = FS.my_Read_MTime(request["inodeNumber"]);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_mkdir")
+            {
+                response["status"] = FS.my_mkdir(
+                    request["path"],
+                    request["user"]["UID"],
+                    request["user"]["GID"]);
+
+                response["what"] = request["path"];
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_read")
+            {
+
+                res = FS.my_Read(request["position"],
+                request["size"],
+                request["inodeNumber"]);
+                reading = true;   
+            }
+            else if (request["call"] == "my_create")
+            {
+
+                int inn = FS.my_create(request["path"],
+                                        request["user"]["UID"],
+                                        request["user"]["GID"]);
+                response["inodeNumber"] = inn;
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_write")
+            {
+                response["status"] = 0;
+                file_descriptor = new int[3];
+                file_descriptor[0] = request["position"];
+                file_descriptor[1] = request["size"];
+                file_descriptor[2] = request["inodeNumber"];
+                writing = true;
+                //******************************************************************************
+            }
+            else if (request["call"] == "get_block_use")
+            {
+                response["blockuse"] = FS.get_block_use(request["inodeNumber"]);
+                //******************************************************************************
+            }else if (request["call"] == "my_remove_entry")
+            {
+                request["status"] = FS.my_remove_entry(request["inodeNumber"],0);
+                //******************************************************************************
+            }
+            else
+            {
+                string data = "";
+                data.append(request["call"]);
+                data.append(": call not found!");
+                response = {{"error", true}, {"message", data}};
+            }
+
+            if(!reading){
+                res = response.dump();
+            }else{
+                reading = false;   
+            }
         }
-        else if (request["call"] == "my_read")
-        {
-            response["buffer"] = FS.my_Read(request["iNodeNumber"], request["position"], request["size"]);
-        }
-        else if (request["call"] == "my_create")
-        {
-            //******************************************************************************
-        }
-        else if (request["call"] == "get_block_use")
-        {
-            response["blockuse"] = FS.get_block_use(request["inodeNumber"]);
-            //******************************************************************************
-        }
-        else
-        {
-            string data = "";
-            data.append(request["call"]);
-            data.append(": call not found!");
-            response = {{"error", true}, {"message", data}};
-        }
-        res = response.dump();
-    }
-    else
+    }else
     {
         res = msg;
     }
@@ -161,6 +206,8 @@ char *FS_CONNECTOR::execute(string msg)
 
 FS_CONNECTOR::FS_CONNECTOR(string file)
 {
+    this->reading = false;
+    this->writing = false;
     this->file_name = file;
 }
 
@@ -251,7 +298,7 @@ int main(int argc, char *argv[])
             else if (strlen(msg) != 0)
             {
                 cout << "Request:" << msg << endl;
-                strcpy(msg, FS_C.execute(msg)); // message handler
+                strcpy(msg, FS_C.execute(msg,newSd)); // message handler
                 cout << "Response:" << msg << endl;
                 send(newSd, (char *)&msg, strlen(msg), 0); // sends response
             }
