@@ -1669,10 +1669,12 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 		cerr << "write position greater than the size of the existing file." << endl;
 	}
 	if (success) {
+        /*
 		if (position > 0) {
 			start = position % BLOCKSIZE;
 			startBlock = (position - start) / BLOCKSIZE;
 		}
+        */
 		// if starting block is not in first indirect block map.
 		if (startBlock > 11) { 
 			startBlock = startBlock - 12;
@@ -1680,8 +1682,8 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			startBlock = startBlock % 1024; // mod by size of indirect block map size
 		}
 		
-		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
-		numberOfBlocks = (((nBytes + start) - ((nBytes + start) % BLOCKSIZE))/BLOCKSIZE) + 1;
+		//fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+		//numberOfBlocks = (((nBytes + start) - ((nBytes + start) % BLOCKSIZE))/BLOCKSIZE) + 1;
 		
         /*
 		// check if my_extend() will ever fail before write / wont be able to complete write.
@@ -1726,19 +1728,26 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			delete temp;
 		}
         */
+        start = position % BLOCKSIZE;
         
 		int* addresses;
         char* buffer2;
         int bytesWritten = 0;
         bool done = false;
-        int currentBlock = startBlock;
-        int currentID = indirectBlockNumber;
+        int currentBlock = position / BLOCKSIZE;
+        int currentID;
+        if (currentBlock < 12) {
+            currentID = 0;
+        } else {
+            currentID = (currentBlock - 12) / 1024;
+        }
         int k = 0;
         if (currentBlock < 12) {
             addresses = get_addresses(inodeNumber, 0);
             for (int i = currentBlock; i < 12; i++) {
                 if (addresses[i] == 0) {
                     my_extend(inodeNumber);
+                    delete addresses;
                     addresses = get_addresses(inodeNumber, 0);
                     //cout << " extended ";
                 }
@@ -1775,6 +1784,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                 
                 if (addresses[i] == 0) {
                     my_extend(inodeNumber);
+                    delete addresses;
                     addresses = get_addresses(inodeNumber, currentID);
                 }
                 buffer2 = readBlock(addresses[i]);
@@ -1801,6 +1811,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                 }
             }
             currentID++;
+            delete addresses;
         }
 
         /*
