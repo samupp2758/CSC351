@@ -1429,7 +1429,11 @@ int FileSystem::my_readPath(string path, int& parentInode, string& name) {
         }
         //cout << currentName << endl;
         parentInodeNum = currentInodeNum;
-        my_search_dir(parentInodeNum, currentName, currentInodeNum);
+        int worked = my_search_dir(parentInodeNum, currentName, currentInodeNum);
+        if (worked == -1) {
+            currentInodeNum = -1;
+            break;
+        }
         i++;
     }
     //cerr << currentName;
@@ -1550,7 +1554,6 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 	int* fileBlocks;
 	int indirectBlockNumber = 0;
 	int numberOfBlocks = 0;
-
 	if (position < 0|| (position + nBytes) > fileSize) {
 		cerr << "start of read position is invalid";
 	} else {
@@ -1567,14 +1570,15 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 		}
 		
 		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
-		
 		if (nBytes % BLOCKSIZE == 0) {
 			numberOfBlocks = nBytes / BLOCKSIZE;
 		} else {
 			numberOfBlocks = ((nBytes - (nBytes % BLOCKSIZE))/BLOCKSIZE) + 1;
 		}
-		
+        cout << "Number Of Blocks" << numberOfBlocks << endl;
+        cout << "Starting Block" << startBlock << endl;
 		for(int i = startBlock; i < numberOfBlocks; i++) {
+            cerr << "ran 4" << endl;
 			if (currentByte == nBytes) {
 				break;
 			}
@@ -1642,7 +1646,6 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 		success = false;
 		cerr << "write position greater than the size of the existing file." << endl;
 	}
-	
 	if (success) {
 		if (position > 0) {
 			start = position % BLOCKSIZE;
@@ -1686,8 +1689,11 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 		}
 		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 	}
+    cout << "number of blocks " << numberOfBlocks << endl;
+    cout << "start block " << startBlock << endl;
 	if (success) {
 	
+        /*
 		if (start != 0) {
 			char * temp = readBlock(fileBlocks[startBlock]);
 			for (int i = 0; i < start; i++) {
@@ -1695,12 +1701,74 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			}
 			delete temp;
 		}
-		
+        */
+		int* addresses;
+        char* buffer2;
+        int bytesWritten = 0;
+        bool done = false;
+        int currentBlock = startBlock;
+        int currentID = indirectBlockNumber;
+        int k = 0;
+        if (currentBlock < 12) {
+            addresses = get_addresses(inodeNumber, 0);
+            for (int i = currentBlock; i < 12; i++) {
+                buffer2 = readBlock(addresses[i]);
+                cerr << "ran 1" << endl;
+ 
+                for (int j = start; j < 4096; j++) {
+                    if (bytesWritten >= nBytes) {
+                        done = true;
+                        break;
+                    }
+                    buffer2[j] = buffer[k];
+                    bytesWritten++;
+                    k++;
+                }
+                if (start > 0) {
+                    start = 0;
+                }
+                cerr << "ran 2" << endl;
+                writeBlock(addresses[i], buffer2);
+                currentBlock++;
+                delete buffer2;
+            }
+            delete addresses;
+            currentID;
+        }
+        while (!done) {
+            addresses = get_addresses(inodeNumber, currentID);
+            for (int i = (currentBlock - 12) % 1024; i < 1024; i++) {
+                buffer2 = readBlock(addresses[i]);
+
+                for (int j = start; j < 4096; j++) {
+                    if (bytesWritten >= nBytes) {
+                        done = true;
+                        break;
+                    }
+                    buffer2[j] = buffer[k];
+                    bytesWritten++;
+                    k++;
+                }
+                if (start > 0) {
+                    start = 0;
+                }
+                writeBlock(addresses[i], buffer2);
+                currentBlock++;
+                delete buffer2;
+                if (done) {
+                    break;
+                }
+            }
+            currentID++;
+        }
+
+        /*
 		for (int i = startBlock; i < numberOfBlocks; i++) {
 			if (currentByte >= nBytes) {
 				break;
 			}
 			
+            
 			if (indirectBlockNumber == 0) {
 				if (i > 11) {
 					numberOfBlocks = numberOfBlocks - 12;
@@ -1709,6 +1777,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			} else if (indirectBlockNumber > 0) {
+                cout << "ran" << endl;
 				if (i > 1024) {
 					numberOfBlocks = numberOfBlocks - 1024;
 					i = i - 1024;
@@ -1716,6 +1785,13 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			}
+            
+            if (indirectBlockNumber == 0) {
+                if (i < 12) {
+                    indirectBlockNumber++;
+					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+                }
+            }
 			
 			for (int j = 0; j < BLOCKSIZE; j++) {
 				if (currentByte == nBytes) {
@@ -1732,6 +1808,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			}
 			writeBlock(fileBlocks[i], newBuffer);	
 		}
+        */
 	
 		my_Set_Size(inodeNumber, my_Read_Size(inodeNumber) + nBytes);
 		my_Set_MTime(inodeNumber);
@@ -1739,13 +1816,28 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 	} else {
 		cerr << "Write has failed" << endl;
 	}
-	
 	delete newBuffer, fileBlocks;
 	return success;
 }
 
 //******************************************************************************
+//Needs testing
+int FileSystem::my_create(string path, int user, int group) {
+    int parentInode;
+    string name;
+    int doesExist = my_readPath(path, parentInode, name);
+    if (doesExist != -1) {
+        int position = my_search_dir(parentInode, name);
+        my_remove_entry(parentInode, position);
+    }
+    char mode[] = {61, 160};
+    int myInode = create_inode(mode, user, group);
+    my_write_dir(parentInode, myInode, name);
+    return myInode;
+}
 
+
+//******************************************************************************
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
