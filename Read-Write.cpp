@@ -42,9 +42,10 @@ char* FileSystem::readBlock(int blockNumber) {
         int position = blockNumber * BLOCKSIZE;
         disk.seekg(position);
         disk.read(dataBlock, BLOCKSIZE);
+        cerr << blockNumber << endl;
     } else {
         dataBlock = NULL;
-        cout << "Invalid blockNumber\n";
+        cerr << "Invalid blockNumber " << blockNumber << "\n";
     }
     
     return dataBlock;
@@ -921,6 +922,7 @@ bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNu
         DIndirect = characters_To_Integer(cDIndirect);
     }
     if (!full) {
+        cout << "DIndirect" << DIndirect << endl;
         char* buffer = readBlock(DIndirect);
         for (int i = 0; i < 4096; i += 4) {
             success = my_Add_Address_Indirect(buffer, i, blockNumber, full);
@@ -928,6 +930,7 @@ bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNu
                 break;
             }
             if (success) {
+                cerr << "ran ran ran" << endl;
                 writeBlock(DIndirect, buffer);
                 break;
             }
@@ -977,6 +980,7 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
     //Search the double indirect block
     if (!found && !full) {
         found = my_Add_Address_DIndirect(buffer, location[1] + 71, blockNumber, full);
+        //cout << "last" << endl;
         writeBlock(location[0], buffer);
     }
     //Seaerch the triple indirect block
@@ -1062,8 +1066,11 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
     } else if (indirect_block < 1026) {
         //Double indirect block
         result = new int[1024];
+        cerr << "is this it" << endl;
         char* DIBuffer = readBlock(characters_To_Integer(&buffer[71 + offset]));
-        char* IBuffer = readBlock(characters_To_Integer(&DIBuffer[indirect_block - 2]));
+        cerr << "DI offset " << indirect_block - 2 << endl;
+        cerr << "\n DI number " << characters_To_Integer(&DIBuffer[indirect_block - 2]) << endl;
+        char* IBuffer = readBlock(characters_To_Integer(&DIBuffer[(indirect_block - 2) * 4]));
         for (int i = 0; i < 1024; i++) {
             result[i] = characters_To_Integer(&IBuffer[i * 4]);
         }
@@ -1072,9 +1079,9 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
         result = new int[1024];
         char* TIBuffer = readBlock(characters_To_Integer(&buffer[75 + offset]));
         int DINum = (indirect_block - 2) / 1024;
-        char* DIBuffer = readBlock(characters_To_Integer(&TIBuffer[DINum]));
+        char* DIBuffer = readBlock(characters_To_Integer(&TIBuffer[DINum * 4]));
         int INum = (indirect_block - 1) % 1024;
-        char* IBuffer = readBlock(characters_To_Integer(&DIBuffer[INum]));
+        char* IBuffer = readBlock(characters_To_Integer(&DIBuffer[INum * 4]));
         for (int i = 0; i < 1024; i++) {
             result[i] = characters_To_Integer(&IBuffer[i * 4]);
         }
@@ -1594,7 +1601,6 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
         cout << "Number Of Blocks" << numberOfBlocks << endl;
         cout << "Starting Block" << startBlock << endl;
 		for(int i = startBlock; i < numberOfBlocks; i++) {
-            cerr << "ran 4" << endl;
 			if (currentByte == nBytes) {
 				break;
 			}
@@ -1876,7 +1882,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
-    createDataFile(1024 * 1024 * 16, name);
+    createDataFile(1024 * 1024 * 32, name);
     char* buffer;
 
     //Mark 0-1041 as used on the block bitmap
