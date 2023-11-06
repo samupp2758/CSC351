@@ -1611,7 +1611,7 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			} else if (indirectBlockNumber > 0) {
-				if (i > 1024) {
+				if (i > 1023) {
 					numberOfBlocks = (((nBytes - currentByte) - ((nBytes - currentByte) % BLOCKSIZE))/BLOCKSIZE) + 1;					i = i - 12;
 					i = i - 1024;
 					indirectBlockNumber++;
@@ -1697,7 +1697,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 					fileBlocks = get_addresses(inodeNumber, ibn);
 				}
 			} else if (ibn > 0) {
-				if (i > 1024) {
+				if (i > 1023) {
 					nb = nb - 1024;
 					i = i - 1024;
 					ibn++;
@@ -1829,7 +1829,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 				}
 			} else if (indirectBlockNumber > 0) {
                 cout << "ran" << endl;
-				if (i > 1024) {
+				if (i > 1023) {
 					numberOfBlocks = numberOfBlocks - 1024;
 					i = i - 1024;
 					indirectBlockNumber++;
