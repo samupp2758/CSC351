@@ -640,7 +640,7 @@ int FileSystem::allocate() {
                     writeBlock(bitmap, buffer);
                     //get the remaining amount left in the current currentBits flipped
                     currentBits = character_To_Binary(buffer[i]);
-                    for(int x = 0; x < 8-startingBlockTracker; x++){
+                    for(int x = 0; x <= startingBlockTracker-1; x++){
                         currentBits[x] = true;
                     }
                     //put it in the buffer
@@ -809,7 +809,11 @@ bool FileSystem::my_extend(int inodeNumber) {
     bool rc = false;
     bool successfulAdd;
     startingBlock = allocate();
-    if(startingBlock != 0) {
+    for (int i= 0; i < 8; i++) {
+        cout << startingBlock + i << " ";
+    }
+
+    //if(startingBlock != 0) {
         for(int x = startingBlock; x < (startingBlock + 8); x++) {
             successfulAdd = my_Add_Address(inodeNumber, x);
             if (!successfulAdd) {
@@ -817,7 +821,7 @@ bool FileSystem::my_extend(int inodeNumber) {
             }
         }
         rc = true;
-    }
+    //}
     return rc;
 
 }
@@ -831,9 +835,13 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
     int indirectBlock;
     int success = false;
     //Check if the indirect block exists
+    //int IDNum = characters_To_Integer(&block[location]);
+    //cout << IDNum << endl;
     if (!block[location] && !block[location + 1] && !block[location + 2] && !block[location + 3]) {
+    //if (IDNum == 0) {
         //If it doesn't, then create it.
         indirectBlock = single_Allocate();
+        cout << "single allocate " << indirectBlock << endl;
         if (indirectBlock != 0) {
             char* buffer = readBlock(indirectBlock);
             for (int i = 0; i < 4096; i++) {
@@ -849,7 +857,9 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
         } else {
             full = true;
         }
+        //cout << "does not exist" << endl;
     } else { //It does exist
+        //cout << "does exist" << endl;
         char cIndirectBlock[4];
         cIndirectBlock[0] = block[location];
         cIndirectBlock[1] = block[location + 1];
@@ -859,6 +869,9 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
     }
     if (!full) {
         char* buffer = readBlock(indirectBlock);
+        //cout << "indirect block number " << indirectBlock << endl;
+        //cout << "block number " << blockNumber << endl;
+
         for (int i = 0; i < 4096; i += 4) {
             //Check if an address in null, and thus not in use.
             if (!buffer[i] && !buffer[i + 1] && !buffer[i + 2] && !buffer[i + 3]) {
@@ -958,10 +971,13 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
     //Search the first indirect block
     if (!found) {
         found = my_Add_Address_Indirect(buffer, location[1] + 67, blockNumber, full);
+        writeBlock(location[0], buffer);
+        //cout << characters_To_Integer(&buffer[(location[1] + 67)]) << endl;
     }
     //Search the double indirect block
     if (!found && !full) {
         found = my_Add_Address_DIndirect(buffer, location[1] + 71, blockNumber, full);
+        writeBlock(location[0], buffer);
     }
     //Seaerch the triple indirect block
     if (!found && !full) {
@@ -980,7 +996,7 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
                 buffer[TOffset + 1] = cTDirect[1];
                 buffer[TOffset + 2] = cTDirect[2];
                 buffer[TOffset + 3] = cTDirect[3];
-
+                writeBlock(location[0], buffer);
                 delete buffer2, cTDirect;
             } else {
                 full = true;
@@ -1584,14 +1600,14 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 			}
 			if (indirectBlockNumber == 0) {
 				if (i > 11) {
-					numberOfBlocks = (((nBytes - currentByte) - ((nBytes - currentByte) % BLOCKSIZE))/BLOCKSIZE) + 1;
+					numberOfBlocks = numberOfBlocks - 12;
 					i = i - 12;
 					indirectBlockNumber++;
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			} else if (indirectBlockNumber > 0) {
 				if (i > 1024) {
-					numberOfBlocks = (((nBytes - currentByte) - ((nBytes - currentByte) % BLOCKSIZE))/BLOCKSIZE) + 1;
+					numberOfBlocks = numberOfBlocks - 1024;
 					i = i - 1024;
 					indirectBlockNumber++;
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
@@ -1661,6 +1677,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 		numberOfBlocks = (((nBytes + start) - ((nBytes + start) % BLOCKSIZE))/BLOCKSIZE) + 1;
 		
+        /*
 		// check if my_extend() will ever fail before write / wont be able to complete write.
 		int nb = numberOfBlocks;
 		int ibn = indirectBlockNumber;	//temp variables
@@ -1688,6 +1705,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			}
 		}
 		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
+        */
 	}
     cout << "number of blocks " << numberOfBlocks << endl;
     cout << "start block " << startBlock << endl;
@@ -1702,6 +1720,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			delete temp;
 		}
         */
+        
 		int* addresses;
         char* buffer2;
         int bytesWritten = 0;
@@ -1712,8 +1731,12 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
         if (currentBlock < 12) {
             addresses = get_addresses(inodeNumber, 0);
             for (int i = currentBlock; i < 12; i++) {
+                if (addresses[i] == 0) {
+                    my_extend(inodeNumber);
+                    addresses = get_addresses(inodeNumber, 0);
+                    //cout << " extended ";
+                }
                 buffer2 = readBlock(addresses[i]);
-                cerr << "ran 1" << endl;
  
                 for (int j = start; j < 4096; j++) {
                     if (bytesWritten >= nBytes) {
@@ -1727,18 +1750,29 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                 if (start > 0) {
                     start = 0;
                 }
-                cerr << "ran 2" << endl;
                 writeBlock(addresses[i], buffer2);
                 currentBlock++;
                 delete buffer2;
             }
             delete addresses;
-            currentID;
+            currentID++;
         }
+        //cerr << "ran 1" << endl;
+        //cout << "current id " << currentID << endl;
         while (!done) {
             addresses = get_addresses(inodeNumber, currentID);
+            for (int i = 0; i < 1024; i++) {
+                //cout << addresses[i] << " ";
+            }
             for (int i = (currentBlock - 12) % 1024; i < 1024; i++) {
+                //cerr << "ran 2" << endl;
+                
+                if (addresses[i] == 0) {
+                    my_extend(inodeNumber);
+                    addresses = get_addresses(inodeNumber, currentID);
+                }
                 buffer2 = readBlock(addresses[i]);
+                //cerr << "ran 3" << endl;
 
                 for (int j = start; j < 4096; j++) {
                     if (bytesWritten >= nBytes) {
@@ -1749,6 +1783,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                     bytesWritten++;
                     k++;
                 }
+                //cerr << "ran 4" << endl;
                 if (start > 0) {
                     start = 0;
                 }
@@ -1841,7 +1876,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
-    createDataFile(1024 * 1024 * 8, name);
+    createDataFile(1024 * 1024 * 16, name);
     char* buffer;
 
     //Mark 0-1041 as used on the block bitmap
