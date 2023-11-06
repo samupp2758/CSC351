@@ -30,7 +30,7 @@ int main() {
     //file.open("PH1_Design_Document.txt");
     
     
-    file.open("PH1_Design_Document-Copy.txt"); 
+    file.open("PH1_Design_Document.txt");
     file.seekg(0, ios::end);
     int length = file.tellg();
     file.seekg(0, ios::beg);
@@ -64,13 +64,13 @@ int main() {
 
     cerr << "time to read" << endl;
     
-    /*
+    
     char* result = FS.my_Read(inodeNumber, 0, length);
     //cerr << "ran" << endl;
     file.open("ResultsDoc.txt", ios::out | ios::binary);
     file.write(result, length);
     file.close();
-    */
+    
 
     /*
     cout << endl;

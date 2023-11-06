@@ -11,7 +11,7 @@
 using namespace std;
 
 //Must compile with -funsigned-char
-//Assuming all characters are unsigned characters
+//Assuming all characters are unsigned characters 
 
 //******************************************************************************
 
@@ -42,7 +42,7 @@ char* FileSystem::readBlock(int blockNumber) {
         int position = blockNumber * BLOCKSIZE;
         disk.seekg(position);
         disk.read(dataBlock, BLOCKSIZE);
-        cerr << blockNumber << endl;
+        //cerr << blockNumber << endl;
     } else {
         dataBlock = NULL;
         cerr << "Invalid blockNumber " << blockNumber << "\n";
@@ -1568,7 +1568,7 @@ int FileSystem::create_inode(char* mode, int user, int group) {
 // Needs testing.
 char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 	char* rc;
-	char* temp;
+	char* temp = new char[5];
 	rc = new char[nBytes];
 	int fileSize = my_Read_Size(inodeNumber);
 	int start = 0;
@@ -1609,13 +1609,15 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 					numberOfBlocks = numberOfBlocks - 12;
 					i = i - 12;
 					indirectBlockNumber++;
+                    delete fileBlocks;
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			} else if (indirectBlockNumber > 0) {
-				if (i > 1024) {
+				if (i >= 1024) {
 					numberOfBlocks = numberOfBlocks - 1024;
 					i = i - 1024;
 					indirectBlockNumber++;
+                    delete fileBlocks;
 					fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 				}
 			}
@@ -1623,6 +1625,7 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 				cerr << "no block alocated" << endl;
 				break;
 			}
+            delete temp;
 			temp = readBlock(fileBlocks[i]);
 			
 			if (i == startBlock) {
@@ -1893,7 +1896,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
-    createDataFile(1024 * 1024 * 32, name);
+    createDataFile(1024 * 1024 * 256, name);
     char* buffer;
 
     //Mark 0-1041 as used on the block bitmap
