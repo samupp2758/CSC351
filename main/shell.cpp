@@ -173,15 +173,18 @@ string to_abspath(string curDir, string raw){
 
 char *Shell::request(json req_json, char* buffer)
 {
-    char req[4096];
+    int size = 4096;
+    if(req_json["call"] == "my_read"){
+        size = int(req_json["size"]);
+    }
+
+    char req[size];
     req_json["user"] = user;
     string req_ = req_json.dump();
     memset(&req, 0, sizeof(req)); // clear the buffer
     strcpy(req, req_.c_str());
     send(clientSd, (char *)&req, strlen(req), 0);
     memset(&req, 0, sizeof(req)); // clear the buffer
-
-                    cout<<req_json<<endl;
     recv(clientSd, (char *)&req, sizeof(req), 0);
 
     if(buffer != NULL){
@@ -192,7 +195,10 @@ char *Shell::request(json req_json, char* buffer)
         recv(clientSd, (char *)&req, sizeof(req), 0);
     }
 
-    return strcat(req, "");
+    int i = 0;
+    char*res=new char[size];
+    strcpy(res,req);
+    return res;
 }
 
 //******************************************************************************
@@ -250,12 +256,12 @@ void Shell::build_ls(json callResponses,char* r){
     }
 }
 
-//******************************************************************************
+//************************* *****************************************************
 
 void Shell::my_ls(char **input)
 {
     string help = "usage: ls path/to/directory";
-    char *r; //Request
+    char *r; //Reque st
     json r_j;
     json p_r;
     bool rc = false;
@@ -272,7 +278,6 @@ void Shell::my_ls(char **input)
         }else{
             pd = (input[1] ? to_abspath(curDir,input[1]) : curDir);
         } 
-
         if(input[2]){
             string g = "";
             g.append("Too many arguments!");
@@ -450,7 +455,8 @@ void Shell::my_Lcp(char **input)
     string help = "usage: Lcp filesystem/source machine/destination";
     bool rc = false;
     char* r;
-    char buff[3000];
+    char curDir_m[3000];
+    getcwd(curDir_m,3000);
     json callResponses = {{}};
     
     try{
@@ -496,43 +502,65 @@ void Shell::my_Lcp(char **input)
             throw g;
         }
 
+        string path = to_abspath(curDir_m,input[2]);
+        
+        string path_2 = to_abspath(curDir,input[1]);
+        char **abs = ::line_splitter((char*)path_2.data(), "/");
+
+        string filename;
+        int j = 0;
+		while(abs[j]) {
+            filename = abs[j];
+            j++;
+        }
+
+        if(path == curDir_m){
+            path = input[2];
+            path.append(filename);
+        }
+
+        ofstream file;
+        file.open (path);
+
+        if(!file.is_open()){
+            string g = path;
+            g.append(": No such file or directory");
+            throw g;
+        }
+
         if(rc){
-            //Opens the file on the machine
-            char curDir_m[3000];
-            getcwd(curDir_m, 3000);
-            string path = to_abspath(curDir_m,input[1]);
-            ofstream dest_f (path);
-            if(dest_f.is_open()){
-                //Gets the size of the file
-                json req = {{"call", "my_Read_Size"},
-                {"inodeNumber",callResponses[0]["inodeNumber"]}};
-                char* size_res = request(req);
-                json size_res_json = json::parse((string)size_res);
-                
-                int count = 0;
-                int buffer_s = ((size_res_json["size"] < 4096) ? int(size_res_json["size"]) : 4096);
-                string final_ = "";
-                while(1){
-                    json req = {{"call", "my_read"},
-                    {"inodeNumber",callResponses[0]["inodeNumber"]},
-                    {"size",buffer_s},
-                    {"position",count}};
-                    char* my_read_res = request(req);
-                    if(my_read_res != (char*)-1){
-                        count += buffer_s;
-                        final_.append(my_read_res);
-                    }else{
-                        break;
-                    }
-                    cout<<count<<endl;
+            //Gets the size of the file
+            json req = {{"call", "my_Read_Size"},
+            {"inodeNumber",callResponses[0]["inodeNumber"]}};
+            char* size_res = request(req);
+            json size_res_json = json::parse((string)size_res);
+            
+            int count = 0;
+            int buffer_s = 1024;
+            //int buffer_s = size_res_json["size"];
+            string final_ = "";
+            while(1){
+                if(count >= size_res_json["size"]){
+                    break;
                 }
-                dest_f.close();
-                //while loop calling my_read
-                //closes file on the machine
-            }else{
-                string g = "No such a file or directory";
-                throw g;
+                if((count+buffer_s) >= size_res_json["size"]){
+                    buffer_s = (int)size_res_json["size"] - count;
+                }
+
+                json req = {{"call", "my_read"},
+                {"inodeNumber",callResponses[0]["inodeNumber"]},
+                {"nBytes",buffer_s},
+                {"size",size_res_json["size"]},
+                {"position",count}};
+                char* my_read_res = request(req);
+                    
+                count += buffer_s;
+                final_.append(my_read_res);
             }
+            //cout<<final_<<endl;
+            file << final_;
+            file.close();
+            cout<<"Success! Created in: "<<path<<endl;
         }
     }catch(string e){
         cout<<"Icp: "<<e<<endl;
@@ -541,7 +569,94 @@ void Shell::my_Lcp(char **input)
 
 //******************************************************************************
 
-void Shell::my_cat(char **input){}
+void Shell::my_cat(char **input){
+     string help = "usage: cat path/to/file";
+    bool rc = false;
+    char* r;
+    json callResponses = {{}};
+    
+    try{
+
+        if((!input[1] || input[2]) || (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }
+        // check permission that you are able to access that file
+        bool rc = false;
+        char* r;
+        json callResponses = {{}};
+        string pd = to_abspath(curDir,input[1]);
+        json requestForms = {
+            {{"call", "my_readPath"}},
+            {{"call", "my_getPerm"}},
+        };
+
+        //Requests all the system calls on the list
+        for (int i = 0; i < requestForms.size(); i++){
+            requestForms[i]["path"] = pd;
+            r = request(requestForms[i]);
+            callResponses[i] = json::parse((string)r);
+        }
+
+        switch (int(callResponses[1]["permission"]))
+            {
+            case 4:/* r-- */rc = true;break;
+            case 5:/* r-x */rc = true;break;
+            case 6:/* rw- */rc = true;break;
+            case 7:/* rwx */rc = true;break;
+            default:
+                string d = "ls: permission denied: ";
+                d.append(pd);
+                throw d;
+                break;
+            }
+        
+
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            string g = pd;
+            g.append(": No such file or directory");
+            throw g;
+        }
+
+        if(rc){
+            //Gets the size of the file
+            json req = {{"call", "my_Read_Size"},
+            {"inodeNumber",callResponses[0]["inodeNumber"]}};
+            char* size_res = request(req);
+            json size_res_json = json::parse((string)size_res);
+            
+            int count = 0;
+            int buffer_s = 1024;
+            //int buffer_s = size_res_json["size"];
+            string final_ = "";
+            while(1){
+                if(count >= size_res_json["size"]){
+                    break;
+                }
+                if((count+buffer_s) >= size_res_json["size"]){
+                    buffer_s = (int)size_res_json["size"] - count;
+                }
+
+                json req = {{"call", "my_read"},
+                {"inodeNumber",callResponses[0]["inodeNumber"]},
+                {"nBytes",buffer_s},
+                {"size",size_res_json["size"]},
+                {"position",count}};
+                char* my_read_res = request(req);
+                
+                int i = count;
+                while(i < buffer_s){
+                    cout<<my_read_res[i];
+                    i++;
+                }
+                cout<<endl;
+                count += buffer_s;
+            }
+        }
+    }catch(string e){
+        cout<<"cat: "<<e<<endl;
+    }
+}
 
 //******************************************************************************
 
@@ -550,6 +665,8 @@ void Shell::my_Icp(char **input)
     string help = "usage: Icp machine/source filesystem/destination";
     bool rc = false;
     char* r;
+    char curDir_m[3000];
+    getcwd(curDir_m,3000);
     json callResponses = {{}};
     
     try{
@@ -562,7 +679,9 @@ void Shell::my_Icp(char **input)
             {{"call", "my_getPerm"}},
         };
         string pd = to_abspath(curDir,input[2]);
-
+        if(pd != "/"){
+            pd.append("/");
+        }
         //Requests all the system calls on the list
         for (int i = 0; i < requestForms.size(); i++){
             requestForms[i]["path"] = pd;
@@ -593,9 +712,8 @@ void Shell::my_Icp(char **input)
     
         if(rc){
             string buffer = "";
-            ifstream f(input[1]);
+            ifstream f(input[1]); 
             if(f) { //File exists!
-                //Put in a buffer, and does requests to send the file
 
                 ostringstream ss;
                 ss << f.rdbuf();
@@ -617,11 +735,12 @@ void Shell::my_Icp(char **input)
 
                 path = "";
                 path.append(to_abspath(curDir,input[2]));
-                path.append(filename);
 
-///                json requestForm = {{"call", "my_readPath"},{"path",path}};
-//                r = request(requestForm);
-//                json my_verify_res = json::parse((string)r);
+                if(path != "/"){
+                    path.append("/");
+                }
+
+                path.append(filename);
 
                 json requestForm = {{"call", "my_create"},{"path",path}};
                 r = request(requestForm);
@@ -638,23 +757,30 @@ void Shell::my_Icp(char **input)
                 while(buffer_whole[file_size])file_size++;
 
 
-                int buf_size = 4096;
+                int buf_size = 1024;
                 int count = 0;
                 while(1){
+
                     if(count >= file_size){
                         break;
+                        rc = true;
                     }
 
-                    string buffer_temp = buffer.substr(count,buf_size-1);
+                    if((count+buf_size) >= file_size){
+                        buf_size = (file_size - count);
+                    }
+
+                    string buffer_temp = buffer.substr(count,buf_size);
                     char* buffer_piece = (char*)buffer_temp.c_str();
+                    
 
                     json requestForm = {{"call", "my_write"},
                     {"position",count},
+                    {"nBytes",buf_size},
                     {"size",file_size},
                     {"inodeNumber",my_create_res["inodeNumber"]}};
 
                     r = request(requestForm,buffer_piece);
-
                     json my_write_res = json::parse((string)r);
 
                     if(my_write_res["status"] == 1){
@@ -664,6 +790,7 @@ void Shell::my_Icp(char **input)
                         rc = false;
                         break;
                     }
+
                 }
 
                 if(rc){
@@ -713,6 +840,8 @@ void Shell::execute(string msg)
         my_Lcp(ss);
     else if (!strcmp(ss[0], "Icp"))
         my_Icp(ss);
+    else if (!strcmp(ss[0], "cat"))
+        my_cat(ss);
     else
     {
         string d = "shell: command not found: ";
@@ -724,53 +853,65 @@ void Shell::execute(string msg)
 
 int main(int argc, char *argv[])
 {
+    string help = "usage ./shell [0, 1 or 2 for the user to be used]\n*\n*";
     ::system ("clear");
     Shell shell = Shell("127.0.0.1", 230);
     char msg[4096];
+    json users = {0,0,1};
 
-    struct hostent *host = gethostbyname(shell.serverIp);
-    sockaddr_in sendSockAddr;
-    bzero((char *)&sendSockAddr, sizeof(sendSockAddr));
-    sendSockAddr.sin_family = AF_INET;
-    sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr *)*host->h_addr_list));
-    sendSockAddr.sin_port = htons(shell.port);
-    shell.clientSd = socket(AF_INET, SOCK_STREAM, 0);
-    // try to connect...
-    int status = connect(shell.clientSd, (sockaddr *)&sendSockAddr, sizeof(sendSockAddr));
-    if (status < 0)
-    {
-        cout << "Error connecting to the FS!" << endl;
-        return -1;
-    }
-    cout << "Connected to the FS!" << endl;
 
-    while (1)
-    {
-        string data;
-        cout << shell.curDir << " -> ";
-        getline(cin, data);
+    try{
+        if(!argv[1]) throw help;
+        
+        int user = ((int)argv[1][0] - 48);
+        shell.user = {{"GID",users[user]},{"UID",user}};
 
-        memset(&msg, 0, sizeof(msg)); // clear the buffer
-
-        string str = data;
-        str.erase(std::remove(str.begin(), str.end(), ' '), str.end()); // Verfiy if the input is empty
-
-        if (::strlen(&str[0]) > 0)
+        struct hostent *host = gethostbyname(shell.serverIp);
+        sockaddr_in sendSockAddr;
+        bzero((char *)&sendSockAddr, sizeof(sendSockAddr));
+        sendSockAddr.sin_family = AF_INET;
+        sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr *)*host->h_addr_list));
+        sendSockAddr.sin_port = htons(shell.port);
+        shell.clientSd = socket(AF_INET, SOCK_STREAM, 0);
+        // try to connect...
+        int status = connect(shell.clientSd, (sockaddr *)&sendSockAddr, sizeof(sendSockAddr));
+        if (status < 0)
         {
-            if (data == "exit" || data == "shutdown")
+            cout << "Error connecting to the FS!" << endl;
+            return -1;
+        }
+        cout << "Connected to the FS!" << endl;
+
+        while (1)
+        {
+            string data;
+            cout << shell.curDir << " -> ";
+            getline(cin, data);
+
+            memset(&msg, 0, sizeof(msg)); // c lear the buffer
+
+            string str = data;
+            str.erase(std::remove(str.begin(), str.end(), ' '), str.end()); // Verfiy if the input is empty
+
+            if (::strlen(&str[0]) > 0)
             {
-                strcpy(msg, data.c_str());
-                cout << "Closing..." << endl;
-                send(shell.clientSd, (char *)&msg, strlen(msg), 0);
-                break;
-            }
-            else
-            {
-                shell.execute(data);
+                if (data == "exit" || data == "shutdown")
+                {
+                    strcpy(msg, data.c_str());
+                    cout << "Closing..." << endl;
+                    send(shell.clientSd, (char *)&msg, strlen(msg), 0);
+                    break;
+                }
+                else
+                {
+                    shell.execute(data);
+                }
             }
         }
-    }
 
-    close(shell.clientSd);
-    return 0;
+        close(shell.clientSd);
+    }catch(string e){
+        cout<<"*\n*\n./shell: "<<e<<endl;
+    }    
+        return 0;
 }

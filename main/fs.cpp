@@ -145,10 +145,13 @@ char *FS_CONNECTOR::execute(string msg, int clientSd)
             }
             else if (request["call"] == "my_read")
             {
-
-                res = FS.my_Read(request["position"],
-                request["size"],
-                request["inodeNumber"]);
+                
+                char* temp = FS.my_Read(request["inodeNumber"],
+                request["position"],    
+                request["nBytes"]);
+                if(temp != NULL){
+                    res = temp;
+                }
                 reading = true;   
             }
             else if (request["call"] == "my_create")
@@ -165,7 +168,7 @@ char *FS_CONNECTOR::execute(string msg, int clientSd)
                 response["status"] = 0;
                 file_descriptor = new int[3];
                 file_descriptor[0] = request["position"];
-                file_descriptor[1] = request["size"];
+                file_descriptor[1] = request["nBytes"];
                 file_descriptor[2] = request["inodeNumber"];
                 writing = true;
                 //******************************************************************************
@@ -190,7 +193,7 @@ char *FS_CONNECTOR::execute(string msg, int clientSd)
             if(!reading){
                 res = response.dump();
             }else{
-                reading = false;   
+                reading = false;
             }
         }
     }else
@@ -221,18 +224,19 @@ int main(int argc, char *argv[])
 {
     //argv[0] is the name of the filesytem
     //argv[1] is the flag "new filesystem" and it can be 0 or 1
-    string help = "usage ./fs filesytem.dat 0 (0 for just opening, 1 for erasing any filesystem.dat and creating a new filesytem)\n*\n*";
+    string help = "usage ./fs filesytem.dat [0 or 1 | open or create]\n*\n*";
     ::system ("clear");
     int port = 230;
-    char msg[4096]; // message is 4096 bytes long
+    int buff_size = 4096;
+    char msg[buff_size]; // message is 4096 bytes long
     try{
         if(!argv[1] || !argv[2]) throw help;
         string filename = argv[1];
-        cout<<((argv[2])[0] == '0' ? "Opening" : "Creating")<<" filesytem in "<<filename<<""<<endl;
+        cout<<(!(argv[2])[1] && (argv[2])[0] == '0' ? "Opening" : "Creating")<<" filesytem in "<<filename<<""<<endl;
         
         FS_CONNECTOR FS_C = FS_CONNECTOR(filename);
         FileSystem FS(filename);
-        if((argv[2])[0] == '1'){
+        if((argv[2])[0] != '0'){
             FS.Create_New_FS(filename);
         }else{
             ifstream file;
@@ -298,7 +302,11 @@ int main(int argc, char *argv[])
             else if (strlen(msg) != 0)
             {
                 cout << "Request:" << msg << endl;
-                strcpy(msg, FS_C.execute(msg,newSd)); // message handler
+                char*result_=FS_C.execute(msg,newSd);
+
+                memset(&msg, 0, sizeof(msg)); // clear the buffer
+                strcpy(msg, result_); // message handler
+                
                 cout << "Response:" << msg << endl;
                 send(newSd, (char *)&msg, strlen(msg), 0); // sends response
             }
