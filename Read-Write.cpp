@@ -604,6 +604,7 @@ int FileSystem::allocate() {
         //cerr << "allocate bitmap" << bitmap << endl;
         delete buffer;
         buffer = readBlock(bitmap);
+        emptyBitCounter = 0;
         //cerr << "bitmap 2" << endl;
         for (int i = 0; i < 4096; i++) {
             currentBits = character_To_Binary(buffer[i]);
@@ -825,24 +826,24 @@ bool FileSystem::my_extend(int inodeNumber) {
     //cout << "extend 2" << endl;
     startingBlock = allocate();
     //cout << "extend 3" << endl;
-    cerr << endl;
-    for (int i= 0; i < 8; i++) {
-        cerr << startingBlock + i << " ";
-    }
+    //cerr << endl;
+    //for (int i= 0; i < 8; i++) {
+    //    cerr << startingBlock + i << " ";
+    //}
     //cout << "extend 4" << endl;
 
 
-    //if(startingBlock != 0) {
+    if(startingBlock != 0) {
         for(int x = startingBlock; x < (startingBlock + 8); x++) {
             //cout << "extend 5" << endl;
             successfulAdd = my_Add_Address(inodeNumber, x);
             //cout << "extend 6" << endl;
-            //if (!successfulAdd) {
-            //    mark_blocks_free(&x, 1);
-            //}
+            if (!successfulAdd) {
+                mark_blocks_free(&x, 1);
+            }
         }
         rc = true;
-    //}
+    }
     //cout << "extend 9" << endl;
     return rc;
 
