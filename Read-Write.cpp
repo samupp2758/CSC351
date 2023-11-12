@@ -1636,11 +1636,12 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
             currentByte++;
         }
 
-        cout << "Number Of Blocks " << numberOfBlocks << endl;
-        cout << "Starting Block " << startBlock << endl;
+        cerr << "Number Of Blocks " << numberOfBlocks << endl;
+        cerr << "Starting Block " << startBlock << endl;
 		for(int i = startBlock + 1; i < numberOfBlocks + startBlock; i++) {
             //cerr << "called" << endl;
             cerr << "\nreading" << endl;
+
 			if (currentByte == nBytes) {
 				break;
 			}
@@ -1698,7 +1699,6 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 	char* newBuffer;
 	int* fileBlocks;
 	newBuffer = new char[BLOCKSIZE];
-	
 	if(position > my_Read_Size(inodeNumber)) {
 		success = false;
 		cerr << "write position greater than the size of the existing file." << endl;
@@ -1711,11 +1711,14 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 		}
         */
 		// if starting block is not in first indirect block map.
+
+        /* debugging. I don't think this was ever getting run due to startingBlock being set to 0.
 		if (startBlock > 11) { 
 			startBlock = startBlock - 12;
 			indirectBlockNumber = ((startBlock - (startBlock % 1024)) / 1024) + 1; //find starting indirect block
 			startBlock = startBlock % 1024; // mod by size of indirect block map size
 		}
+        */
 		
 		//fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
 		//numberOfBlocks = (((nBytes + start) - ((nBytes + start) % BLOCKSIZE))/BLOCKSIZE) + 1;
@@ -1750,9 +1753,10 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 		fileBlocks = get_addresses(inodeNumber, indirectBlockNumber);
         */
 	}
-    cout << "number of blocks " << numberOfBlocks << endl;
-    cout << "start block " << startBlock << endl;
+    //cout << "number of blocks " << numberOfBlocks << endl;
+    //cout << "start block " << startBlock << endl;
 	if (success) {
+        cerr << "ran" << endl;
 	
         /*
 		if (start != 0) {
@@ -1774,10 +1778,11 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
         if (currentBlock < 12) {
             currentID = 0;
         } else {
-            currentID = (currentBlock - 12) / 1024;
+            currentID = (currentBlock - 12) / 1024 + 1;
         }
         int k = 0;
         if (currentBlock < 12) {
+            cerr << "first indirect block" << endl;
             addresses = get_addresses(inodeNumber, 0);
             for (int i = currentBlock; i < 12; i++) {
                 if (addresses[i] == 0) {
@@ -1810,6 +1815,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
         //cerr << "ran 1" << endl;
         //cout << "current id " << currentID << endl;
         while (!done) {
+            cerr << "why" << endl;
             addresses = get_addresses(inodeNumber, currentID);
             for (int i = 0; i < 1024; i++) {
                 //cout << addresses[i] << " ";
@@ -1827,6 +1833,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                 for (int j = start; j < 4096; j++) {
                     if (bytesWritten >= nBytes) {
                         done = true;
+                        cerr << "done!!!!!!!!!!" << endl;
                         break;
                     }
                     buffer2[j] = buffer[k];
@@ -1895,8 +1902,8 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			writeBlock(fileBlocks[i], newBuffer);	
 		}
         */
-	
-		my_Set_Size(inodeNumber, my_Read_Size(inodeNumber) + nBytes);
+        int currentSize = my_Read_Size(inodeNumber);
+		my_Set_Size(inodeNumber, (currentSize >= position + nBytes ? currentSize : position + nBytes));
 		my_Set_MTime(inodeNumber);
 		cout << "last 7" << endl;
 	} else {
@@ -1927,7 +1934,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
-    createDataFile(1024 * 1024 * 16, name);
+    createDataFile(1024 * 1024 * 32, name);
     char* buffer;
 
     //Mark 0-1041 as used on the block bitmap
