@@ -14,6 +14,19 @@ Shell::~Shell()
 {
 }
 
+char* appendCharToCharArray(char* array, char a)
+{
+    size_t len = strlen(array);
+
+    char* ret = new char[len+2];
+
+    strcpy(ret, array);    
+    ret[len] = a;
+    ret[len+1] = '\0';
+
+    return ret;
+}
+
 //******************************************************************************
 
 
@@ -175,7 +188,9 @@ char *Shell::request(json req_json, char* buffer)
 {
     int size = 4096;
     if(req_json["call"] == "my_read"){
-        size = int(req_json["size"]);
+        size = int(req_json["nBytes"]);
+    }else if(req_json["call"] == "my_write"){
+        size = int(req_json["nBytes"]);
     }
 
     char req[size];
@@ -187,16 +202,36 @@ char *Shell::request(json req_json, char* buffer)
     memset(&req, 0, sizeof(req)); // clear the buffer
     recv(clientSd, (char *)&req, sizeof(req), 0);
 
+
     if(buffer != NULL){
+        //memset(&req, 0, size); // clear the buffer
+
+        
+        cout<<endl;
+        cout<<endl;
+        cout<<endl;
+        cout<<req_<<endl;
+        int i = 0;
+        while(size >= i){
+            req[i] = buffer[i];
+            cout<<buffer[i];
+            i++;
+        }
+        cout<<endl<<"sending the buffer of size "<<size<<"...."<<endl;
+        
+        send(clientSd, (char *)&req, size, 0);
         memset(&req, 0, sizeof(req)); // clear the buffer
-        strcpy(req, buffer);
-        send(clientSd, (char *)&req, strlen(req), 0);
+        cout<<"***********************************************Buffer sent!"<<endl;
         memset(&req, 0, sizeof(req)); // clear the buffer
         recv(clientSd, (char *)&req, sizeof(req), 0);
-    }
+        cout<<"***********************************************Response received!"<<endl;
 
-    int i = 0;
-    char*res=new char[size];
+        cout<<endl;
+        cout<<endl;
+        cout<<endl;
+    }
+   
+    char *res = new char[size];
     strcpy(res,req);
     return res;
 }
@@ -219,7 +254,7 @@ void Shell::build_ls(json callResponses,char* r){
                 {"position", count}};
             r = request(readDirForm);
             json readDirRes = json::parse((string)r);
-            count = readDirRes["nextPos"];
+            count = count == readDirRes["nextPos"]? (-1) : (int)readDirRes["nextPos"];
 
             if (count == -1) break;
 
@@ -630,10 +665,10 @@ void Shell::my_cat(char **input){
             //int buffer_s = size_res_json["size"];
             string final_ = "";
             while(1){
-                if(count >= size_res_json["size"]){
+                if(count >= (int)size_res_json["size"]){
                     break;
                 }
-                if((count+buffer_s) >= size_res_json["size"]){
+                if((count+buffer_s) >= (int)size_res_json["size"]){
                     buffer_s = (int)size_res_json["size"] - count;
                 }
 
@@ -642,16 +677,14 @@ void Shell::my_cat(char **input){
                 {"nBytes",buffer_s},
                 {"size",size_res_json["size"]},
                 {"position",count}};
-                char* my_read_res = request(req);
                 
-                int i = count;
-                while(i < buffer_s){
-                    cout<<my_read_res[i];
-                    i++;
-                }
-                cout<<endl;
+                //int i = 0;
+                request(req);
+
                 count += buffer_s;
+                ///cout<<endl<<count<<" | "<<(int)size_res_json["size"]<<endl;
             }
+                cout<<endl;
         }
     }catch(string e){
         cout<<"cat: "<<e<<endl;
@@ -711,13 +744,20 @@ void Shell::my_Icp(char **input)
 
     
         if(rc){
-            string buffer = "";
-            ifstream f(input[1]); 
-            if(f) { //File exists!
+            int file_size = 0;
+            fstream file;
+            file.open(to_abspath(curDir_m,input[1]), ios::in | ios::binary);
 
-                ostringstream ss;
-                ss << f.rdbuf();
-                buffer = ss.str();
+            
+            if(file.is_open()) { //File exists!
+                
+                file.seekg(0, ios::end);
+                int file_size = file.tellg();
+                file.seekg(0, ios::beg);
+
+
+                char *buffer = new char[file_size];
+                file.read(buffer,file_size);
 
                 //Gets the name of the file by creating the absolute path to it
                 //Then getting the very last position of the line_splitter "/"
@@ -752,12 +792,7 @@ void Shell::my_Icp(char **input)
                     throw g;
                 }
 
-                char* buffer_whole = (char*)buffer.c_str();
-                int file_size= 0;
-                while(buffer_whole[file_size])file_size++;
-
-
-                int buf_size = 1024;
+                int buf_size = 4096;
                 int count = 0;
                 while(1){
 
@@ -770,9 +805,12 @@ void Shell::my_Icp(char **input)
                         buf_size = (file_size - count);
                     }
 
-                    string buffer_temp = buffer.substr(count,buf_size);
-                    char* buffer_piece = (char*)buffer_temp.c_str();
-                    
+                    char* buffer_piece = new char[buf_size];
+                    int lb = count;
+                    int ub = count+buf_size;
+                    file.seekg(lb, ios::beg);
+                    file.read(buffer_piece,buf_size);
+                    file.seekg(0, ios::beg);
 
                     json requestForm = {{"call", "my_write"},
                     {"position",count},
@@ -782,14 +820,7 @@ void Shell::my_Icp(char **input)
 
                     r = request(requestForm,buffer_piece);
                     json my_write_res = json::parse((string)r);
-
-                    if(my_write_res["status"] == 1){
-                        count += buf_size;
-                        rc = true;
-                    }else{
-                        rc = false;
-                        break;
-                    }
+                    count += buf_size;
 
                 }
 

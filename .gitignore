@@ -1,0 +1,6 @@
+.DS_Store
+main/test/*
+main/fs
+main/shell
+main/*.data
+main/*.dat

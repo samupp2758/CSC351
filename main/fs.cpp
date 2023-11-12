@@ -23,27 +23,33 @@ using namespace std;
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
-char *FS_CONNECTOR::execute(string msg, int clientSd)
+char *FS_CONNECTOR::execute(char* msg, int clientSd)
 {
     FileSystem FS(this->file_name);
     json response;
-    string res = "";
+    char* res = new char[4096];
     if (strcmp(&msg[0], "exit"))
     {   
             if(writing){
-                char* str = (char*)msg.c_str();
-                str[strlen(str)] = '\0';
                 response["call"] = "my_write";
                 response["status"] =  int(FS.my_Write(file_descriptor[2],
                 file_descriptor[0],
-                file_descriptor[1],str));
+                file_descriptor[1],msg));
+
+                int i = 0;
+                while(file_descriptor[1] >= i){
+                    //req[i] = msg[i];
+                    cout<<msg[i];
+                    i++;
+                }
+                cout<<endl;
 
                 file_descriptor[0] = -1;
                 file_descriptor[1] = -1;
                 file_descriptor[2] = -1;
                 writing = false;
 
-                res = response.dump();
+                strcpy(res, (char*)response.dump().data());
 
             }else{
 
@@ -146,13 +152,17 @@ char *FS_CONNECTOR::execute(string msg, int clientSd)
             else if (request["call"] == "my_read")
             {
                 
+                
                 char* temp = FS.my_Read(request["inodeNumber"],
                 request["position"],    
                 request["nBytes"]);
-                if(temp != NULL){
-                    res = temp;
+                int i = 0;
+                while((int)request["nBytes"] > i){
+                    res[i] = temp[i];
+                    i++;
                 }
-                reading = true;   
+                free(temp);
+                reading = true;
             }
             else if (request["call"] == "my_create")
             {
@@ -191,18 +201,16 @@ char *FS_CONNECTOR::execute(string msg, int clientSd)
             }
 
             if(!reading){
-                res = response.dump();
+                strcpy(res,(char*)response.dump().data());
             }else{
                 reading = false;
             }
         }
     }else
     {
-        res = msg;
+        strcpy(res,msg);
     }
-    char *cstr = new char[res.length() + 1];
-    strcpy(cstr, res.c_str());
-    return cstr;
+    return res;
 }
 
 //*************s*****************************************************************
@@ -286,7 +294,8 @@ int main(int argc, char *argv[])
         while (1)
         {
             memset(&msg, 0, sizeof(msg));              // clear the buffer
-            recv(newSd, (char *)&msg, sizeof(msg), 0); // receives message
+            int n_bytes = recv(newSd, msg, buff_size, 0); // receives message
+            cout<<"Received: "<<n_bytes<<endl;
 
             if (!strcmp(msg, "exit"))
             {
@@ -299,16 +308,18 @@ int main(int argc, char *argv[])
                 send(newSd, (char *)&msg, strlen(msg), 0);
                 break;
             }
-            else if (strlen(msg) != 0)
+            else if (n_bytes != 0)
             {
-                cout << "Request:" << msg << endl;
+                cout << "Request:"<<msg<<endl;
                 char*result_=FS_C.execute(msg,newSd);
-
                 memset(&msg, 0, sizeof(msg)); // clear the buffer
                 strcpy(msg, result_); // message handler
                 
+                //free(result_);
+                
                 cout << "Response:" << msg << endl;
-                send(newSd, (char *)&msg, strlen(msg), 0); // sends response
+                int ss = send(newSd, msg, strlen(msg), 0); // sends response
+                cout<<"bytes sent:"<<ss<<endl;
             }
         }
 
