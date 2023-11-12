@@ -1701,7 +1701,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 	newBuffer = new char[BLOCKSIZE];
 	if(position > my_Read_Size(inodeNumber)) {
 		success = false;
-		cerr << "write position greater than the size of the existing file." << endl; //I'm not sure this should be here
+		cerr << "write position greater than the size of the existing file." << endl;
 	}
 	if (success) {
         /*
