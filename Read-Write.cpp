@@ -1782,7 +1782,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
         }
         int k = 0;
         if (currentBlock < 12) {
-            cerr << "first indirect block" << endl;
+            cerr << "first indirect block testing" << endl;
             addresses = get_addresses(inodeNumber, 0);
             for (int i = currentBlock; i < 12; i++) {
                 if (addresses[i] == 0) {
