@@ -243,9 +243,10 @@ int main(int argc, char *argv[])
         cout<<(!(argv[2])[1] && (argv[2])[0] == '0' ? "Opening" : "Creating")<<" filesytem in "<<filename<<""<<endl;
         
         FS_CONNECTOR FS_C = FS_CONNECTOR(filename);
-        FileSystem FS(filename);
         if((argv[2])[0] != '0'){
+            FileSystem FS(filename);
             FS.Create_New_FS(filename);
+            FS.disk.close();
         }else{
             ifstream file;
             file.open(argv[1]);
@@ -323,7 +324,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        FS.disk.close();
+        
         close(newSd);
         close(serverSd);
     }catch(string e){
