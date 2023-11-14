@@ -6,3 +6,4 @@ main/*.data
 main/*.dat
 *.exe
 settings.json
+main/test
