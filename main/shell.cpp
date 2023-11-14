@@ -187,53 +187,58 @@ string to_abspath(string curDir, string raw){
 char *Shell::request(json req_json, char* buffer)
 {
     int size = 4096;
-    if(req_json["call"] == "my_read"){
-        size = int(req_json["nBytes"]);
-    }else if(req_json["call"] == "my_write"){
-        size = int(req_json["nBytes"]);
-    }
 
     char req[size];
     req_json["user"] = user;
     string req_ = req_json.dump();
     memset(&req, 0, sizeof(req)); // clear the buffer
     strcpy(req, req_.c_str());
-    send(clientSd, (char *)&req, strlen(req), 0);
+    int sent_bytes = send(clientSd, (char *)&req, strlen(req), 0);
     memset(&req, 0, sizeof(req)); // clear the buffer
-    recv(clientSd, (char *)&req, sizeof(req), 0);
 
+    //cout<<sent_bytes<<'|'<<strlen(req)<<'|'<<req_.length()<<endl;
+
+
+    int received_bytes;
+    if(req_json["call"] == "my_read"){
+        size = int(req_json["nBytes"]);
+        received_bytes = recv(clientSd, (char *)&req, size, 0);
+        cout<<received_bytes<<endl;
+
+        int i = 0;
+        while(i<received_bytes){
+            //res[i] = req[i];
+            cout<<"|"<<req[i];
+            i++;
+        }
+    }else{
+        received_bytes = recv(clientSd, (char *)&req, sizeof(req), 0);
+    }
 
     if(buffer != NULL){
         //memset(&req, 0, size); // clear the buffer
 
-        
-        cout<<endl;
-        cout<<endl;
-        cout<<endl;
-        cout<<req_<<endl;
+        size = int(req_json["nBytes"]);
+        char req_buffer[size];
         int i = 0;
         while(size >= i){
-            req[i] = buffer[i];
-            cout<<buffer[i];
+            req_buffer[i] = buffer[i];
+            //cout<<buffer[i];
             i++;
         }
-        cout<<endl<<"sending the buffer of size "<<size<<"...."<<endl;
+        send(clientSd, (char *)&req_buffer, size, 0);
+        memset(&req_buffer, 0, sizeof(req_buffer)); // clear the buffer
         
-        send(clientSd, (char *)&req, size, 0);
-        memset(&req, 0, sizeof(req)); // clear the buffer
-        cout<<"***********************************************Buffer sent!"<<endl;
         memset(&req, 0, sizeof(req)); // clear the buffer
         recv(clientSd, (char *)&req, sizeof(req), 0);
-        cout<<"***********************************************Response received!"<<endl;
 
-        cout<<endl;
-        cout<<endl;
-        cout<<endl;
     }
    
-    char *res = new char[size];
-    strcpy(res,req);
-    return res;
+
+
+        char *res = new char[size];
+        strcpy(res,req);
+        return res;
 }
 
 //******************************************************************************
@@ -631,6 +636,14 @@ void Shell::my_cat(char **input){
             r = request(requestForms[i]);
             callResponses[i] = json::parse((string)r);
         }
+        
+
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            string g = pd;
+            g.append(": No such file or directory");
+            throw g;
+        }
 
         switch (int(callResponses[1]["permission"]))
             {
@@ -644,14 +657,6 @@ void Shell::my_cat(char **input){
                 throw d;
                 break;
             }
-        
-
-        //Verifies if the path exists
-        if(callResponses[0]["inodeNumber"] == -1){
-            string g = pd;
-            g.append(": No such file or directory");
-            throw g;
-        }
 
         if(rc){
             //Gets the size of the file
@@ -663,7 +668,7 @@ void Shell::my_cat(char **input){
             int count = 0;
             int buffer_s = 1024;
             //int buffer_s = size_res_json["size"];
-            string final_ = "";
+            //cout<<(int)size_res_json["size"]<<endl;
             while(1){
                 if(count >= (int)size_res_json["size"]){
                     break;
@@ -678,8 +683,13 @@ void Shell::my_cat(char **input){
                 {"size",size_res_json["size"]},
                 {"position",count}};
                 
-                //int i = 0;
                 request(req);
+                /*cout<<buffer_s<<endl;
+                int i = 0;
+                while(i <= buffer_s){
+                    cout<<res[i];
+                    i++;
+                }*/
 
                 count += buffer_s;
                 ///cout<<endl<<count<<" | "<<(int)size_res_json["size"]<<endl;
@@ -750,6 +760,8 @@ void Shell::my_Icp(char **input)
 
             
             if(file.is_open()) { //File exists!
+
+                cout<<"Loading file...."<<endl;
                 
                 file.seekg(0, ios::end);
                 int file_size = file.tellg();
@@ -792,9 +804,13 @@ void Shell::my_Icp(char **input)
                     throw g;
                 }
 
+                cout<<"Transfering file to FS...."<<endl;
+
                 int buf_size = 4096;
                 int count = 0;
                 while(1){
+                    
+                    cout<<"\r"<<(int)(((float)count/(float)file_size)*100)<<"%                   ";
 
                     if(count >= file_size){
                         break;
@@ -823,6 +839,7 @@ void Shell::my_Icp(char **input)
                     count += buf_size;
 
                 }
+                cout<<endl;
 
                 if(rc){
                     cout<<"Success! File "<<filename<<endl;
@@ -873,6 +890,8 @@ void Shell::execute(string msg)
         my_Icp(ss);
     else if (!strcmp(ss[0], "cat"))
         my_cat(ss);
+    else if (!strcmp(ss[0], "clear"))
+        ::system ("clear");
     else
     {
         string d = "shell: command not found: ";

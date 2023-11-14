@@ -36,14 +36,6 @@ char *FS_CONNECTOR::execute(char* msg, int clientSd)
                 file_descriptor[0],
                 file_descriptor[1],msg));
 
-                int i = 0;
-                while(file_descriptor[1] >= i){
-                    //req[i] = msg[i];
-                    cout<<msg[i];
-                    i++;
-                }
-                cout<<endl;
-
                 file_descriptor[0] = -1;
                 file_descriptor[1] = -1;
                 file_descriptor[2] = -1;
@@ -52,7 +44,6 @@ char *FS_CONNECTOR::execute(char* msg, int clientSd)
                 strcpy(res, (char*)response.dump().data());
 
             }else{
-
             json request = json::parse(msg);
             response["call"] = request["call"];
 
@@ -153,16 +144,21 @@ char *FS_CONNECTOR::execute(char* msg, int clientSd)
             {
                 
                 
+                free(res);
+                int size = (int)request["nBytes"];
+                char *res = new char[size];
                 char* temp = FS.my_Read(request["inodeNumber"],
                 request["position"],    
-                request["nBytes"]);
+                size);
+                
                 int i = 0;
-                while((int)request["nBytes"] > i){
+                while(size >= i){
                     res[i] = temp[i];
                     i++;
                 }
-                free(temp);
-                reading = true;
+
+                n_of_bytes_reading = (int)request["nBytes"];
+                return res;
             }
             else if (request["call"] == "my_create")
             {
@@ -311,16 +307,34 @@ int main(int argc, char *argv[])
             }
             else if (n_bytes != 0)
             {
-                cout << "Request:"<<msg<<endl;
+                if(FS_C.writing){
+                    cout << "Request:[data]"<<endl;
+                }else{
+                    cout << "Request:"<<msg<<endl;
+                }
+
                 char*result_=FS_C.execute(msg,newSd);
                 memset(&msg, 0, sizeof(msg)); // clear the buffer
                 strcpy(msg, result_); // message handler
                 
-                //free(result_);
-                
-                cout << "Response:" << msg << endl;
-                int ss = send(newSd, msg, strlen(msg), 0); // sends response
-                cout<<"bytes sent:"<<ss<<endl;
+                int numberOfBytesSent;
+                if(FS_C.n_of_bytes_reading > 0){
+                    cout << FS_C.n_of_bytes_reading<<": Response:";
+
+                    int i = 0;
+                    while(i < FS_C.n_of_bytes_reading ){
+                        cout<<result_[i];
+                        i++;
+                    }
+                    cout<<endl;
+                    numberOfBytesSent = send(newSd, result_, FS_C.n_of_bytes_reading, 0); // sends response
+
+                }else{
+                    cout <<"Response:"<<msg<<endl;
+                    numberOfBytesSent = send(newSd, msg, strlen(msg), 0); // sends response
+                }
+
+                cout<<"bytes sent:"<<numberOfBytesSent<<endl;
             }
         }
 
