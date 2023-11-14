@@ -23,26 +23,30 @@ int main() {
 
     //cout << result[0] << " " << result[1];
     char* buffer = new char[4096];
-    FS.Create_New_FS("disk.dat");
+    FS.Create_New_FS("mix/disk.dat");
     int dirInode = FS.my_mkdir("/directory", 15, 15);
 
     fstream file;
     //file.open("PH1_Design_Document.txt");
     
-    
-    file.open("PH1_Design_Document-Copy.txt"); 
+    file.open("Read-Write.cpp"); 
     file.seekg(0, ios::end);
     int length = file.tellg();
     file.seekg(0, ios::beg);
     char* fileData = new char[length];
     file.read(fileData, length);
     file.close();
-
+    
     char mode[] = {63, 224};
     int inodeNumber = FS.create_inode(mode, 1, 1);
     FS.my_write_dir(dirInode, inodeNumber, "text");
     FS.my_Write(inodeNumber, 0, length, fileData);
     
+    int nInode = FS.my_create("/directory/NewText", 0, 0);
+
+    cout << "success: " << (FS.copy_data(inodeNumber, nInode) ? "success" : "failed") << endl;
+
+
     /*
     
     FS.my_extend(inodeNumber);
@@ -64,13 +68,13 @@ int main() {
 
     cerr << "time to read" << endl;
     
-    /*
-    char* result = FS.my_Read(inodeNumber, 0, length);
+    
+    char* result = FS.my_Read(nInode, 0, length);
     //cerr << "ran" << endl;
     file.open("ResultsDoc.txt", ios::out | ios::binary);
     file.write(result, length);
     file.close();
-    */
+    
 
     /*
     cout << endl;

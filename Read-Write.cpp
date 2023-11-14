@@ -1597,6 +1597,7 @@ int FileSystem::create_inode(char* mode, int user, int group) {
 
 // Needs testing and debuging.
 // Needs testing.
+//Returns an character array of the read data. Returns a pointer to Null if failed.
 char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 	char* rc;
 	char* temp = new char[5];
@@ -1611,6 +1612,8 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 
 	if (position < 0|| (position + nBytes) > fileSize) {
 		cerr << "start of read position is invalid";
+        delete rc, temp;
+        rc = NULL; 
 	} else {
 		
 		if (position > 0) {
@@ -1914,7 +1917,22 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 }
 
 //******************************************************************************
+   
+bool FileSystem::copy_data(int sourceInode, int destInode) {
+    bool rc = false;
+    int size = my_Read_Size(sourceInode);
+    char* buffer;
+    buffer = my_Read(sourceInode, 0, size);
+    if (buffer) { //Check that read was successful.
+        rc = my_Write(destInode, 0, size, buffer);
+        delete buffer;
+    }
+    return rc;
+}
+
+//******************************************************************************
 //Needs testing
+//Returns the inode number of the created file.
 int FileSystem::my_create(string path, int user, int group) {
     int parentInode;
     string name;

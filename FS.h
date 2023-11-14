@@ -81,6 +81,7 @@ class FileSystem {
         int my_Read_CTime(int inodeNumber);
         int* my_index_inodes(int inodeNumber);
         int get_block_use(int inodeNumber);
+        bool copy_data(int sourceInode, int destInode);
 
         //Utility & char conversion
         bool* character_To_Binary(char c);
