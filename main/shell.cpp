@@ -295,7 +295,7 @@ void Shell::build_ls(json callResponses,char* r){
     }
 }
 
-//************************* *****************************************************
+//******************************************************************************
 
 void Shell::my_ls(char **input)
 {
@@ -413,6 +413,30 @@ void Shell::my_cd(char **input)
 
     }catch(string e){
         cout<<"cd: "<<e<<endl;
+    }
+}
+
+//******************************************************************************
+
+void Shell::my_rmdir(char **input)
+{    
+
+    string help = "usage: rmdir path/to/directory";
+    char *r; //Request
+    json r_j;
+    json p_r;
+    string pd;
+    bool rc = false;
+    json callResponses = {{}};
+    json requestForms = {
+        {{"call", "my_readPath"}},
+        {{"call", "my_getPerm"}},
+    };
+
+    try{
+
+    }catch(string e){
+        cout<<"rmdir: "<<e<<endl;
     }
 }
 
@@ -876,6 +900,8 @@ void Shell::execute(string msg)
         my_Icp(ss);
     else if (!strcmp(ss[0], "cat"))
         my_cat(ss);
+    else if (!strcmp(ss[0], "rmdir"))
+        my_rmdir(ss);
     else if (!strcmp(ss[0], "clear"))
         ::system ("clear");
     else

@@ -60,6 +60,7 @@ using namespace std;
             void my_Lcp(char**input);
             void my_Icp(char**input);
             void my_cat(char **input);
+            void my_rmdir(char **input);
 
             //HELPER FUNCTIONS
             char **line_splitter(char *line, string splitter);
