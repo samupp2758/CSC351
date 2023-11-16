@@ -35,16 +35,25 @@ using namespace std;
     class Shell{
         private:
         public:
-            Shell(string serverIp, int port);
+            Shell(string serverIp, int port,int buffer);
             ~Shell();
+            int std_buffer;
             char *serverIp;
             int port;
             int clientSd;
             json user;
             string curDir;
             string *history; //Todo
-            char *request(json req_json,char* buffer = NULL);
+
+            //TCP REQUEST-RESPONSE FUNCTIONS
+            json request(json req_json);
+            int request_write(json req_json,char* buffer);
+            int request_read(json req_json,char* &res);
+            
+            //COMMAND MAIN CONTROLLER
             void execute(string data);
+            
+            //COMMAND CONTROLLERS
             void my_ls(char**input);
             void my_cd(char**input);
             void my_mkdir(char**input);
@@ -52,8 +61,12 @@ using namespace std;
             void my_Icp(char**input);
             void my_cat(char **input);
 
-
+            //HELPER FUNCTIONS
+            char **line_splitter(char *line, string splitter);
+            string format_mode(string mode);
+            string get_parent_path(string path);
             void build_ls(json callResponses, char* r);
+            string to_abspath(string curDir, string raw);
 
     };
 

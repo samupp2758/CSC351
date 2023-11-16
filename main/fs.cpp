@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include "_tcp_fs.h"
-#define bzero(b,len) (memset((b), '\0', (len)), (void) 0)
+#define bzero(b, len) (memset((b), '\0', (len)), (void)0)
 using namespace std;
 // FS side
 
@@ -23,36 +23,36 @@ using namespace std;
 is received, and then returns the response to the client (return cstr).
 The decode (decode = parsed json) and handling of the encoded message
  (encoded = stringfied json ) would be in here */
-char *FS_CONNECTOR::execute(char* msg, int clientSd)
+char *FS_CONNECTOR::execute(char *msg, int clientSd)
 {
     FileSystem FS(this->file_name);
     json response;
-    char* res = new char[4096];
+    char *res = new char[4096];
     if (strcmp(&msg[0], "exit"))
-    {   
-            if(writing){
-                response["call"] = "my_write";
-                response["status"] =  int(FS.my_Write(file_descriptor[2],
-                file_descriptor[0],
-                file_descriptor[1],msg));
+    {
+        if (writing)
+        {
+            response["call"] = "my_write";
+            response["status"] = int(FS.my_Write(file_descriptor[2],
+                                                 file_descriptor[0],
+                                                 file_descriptor[1], msg));
 
-                file_descriptor[0] = -1;
-                file_descriptor[1] = -1;
-                file_descriptor[2] = -1;
-                writing = false;
-
-                strcpy(res, (char*)response.dump().data());
-
-            }else{
+            file_descriptor[0] = -1;
+            file_descriptor[1] = -1;
+            file_descriptor[2] = -1;
+            writing = false;
+        }
+        else
+        {
             json request = json::parse(msg);
             response["call"] = request["call"];
 
             if (request["call"] == "my_getPerm")
             {
                 response["permission"] = FS.my_getPerm(
-                std::string(request["path"]),
-                request["user"]["UID"],
-                request["user"]["GID"]);
+                    std::string(request["path"]),
+                    request["user"]["UID"],
+                    request["user"]["GID"]);
                 //******************************************************************************
             }
             else if (request["call"] == "my_readPath")
@@ -83,13 +83,13 @@ char *FS_CONNECTOR::execute(char* msg, int clientSd)
                 //******************************************************************************
             }
             else if (request["call"] == "my_Read_Mode")
-            {   
-                char*mode = FS.my_Read_Mode((int)request["inodeNumber"]);
+            {
+                char *mode = FS.my_Read_Mode((int)request["inodeNumber"]);
 
-                bool* bool_0= FS.character_To_Binary(mode[0]); //Perms
-                bool* bool_1= FS.character_To_Binary(mode[1]); //Type
+                bool *bool_0 = FS.character_To_Binary(mode[0]); // Perms
+                bool *bool_1 = FS.character_To_Binary(mode[1]); // Type
                 int _0 = FS.characters_To_Integer(mode);
-                
+
                 string type = "";
                 string permissions = "";
 
@@ -142,30 +142,21 @@ char *FS_CONNECTOR::execute(char* msg, int clientSd)
             }
             else if (request["call"] == "my_read")
             {
-                
-                
-                free(res);
+
                 int size = (int)request["nBytes"];
-                char *res = new char[size];
-                char* temp = FS.my_Read(request["inodeNumber"],
-                request["position"],    
-                size);
-                
-                int i = 0;
-                while(size >= i){
-                    res[i] = temp[i];
-                    i++;
-                }
+                char *temp = FS.my_Read(request["inodeNumber"],
+                                        request["position"],
+                                        size);
 
                 n_of_bytes_reading = (int)request["nBytes"];
-                return res;
+                return temp;
             }
             else if (request["call"] == "my_create")
             {
 
                 int inn = FS.my_create(request["path"],
-                                        request["user"]["UID"],
-                                        request["user"]["GID"]);
+                                       request["user"]["UID"],
+                                       request["user"]["GID"]);
                 response["inodeNumber"] = inn;
                 //******************************************************************************
             }
@@ -183,9 +174,10 @@ char *FS_CONNECTOR::execute(char* msg, int clientSd)
             {
                 response["blockuse"] = FS.get_block_use(request["inodeNumber"]);
                 //******************************************************************************
-            }else if (request["call"] == "my_remove_entry")
+            }
+            else if (request["call"] == "my_remove_entry")
             {
-                request["status"] = FS.my_remove_entry(request["inodeNumber"],0);
+                request["status"] = FS.my_remove_entry(request["inodeNumber"], 0);
                 //******************************************************************************
             }
             else
@@ -196,15 +188,21 @@ char *FS_CONNECTOR::execute(char* msg, int clientSd)
                 response = {{"error", true}, {"message", data}};
             }
 
-            if(!reading){
-                strcpy(res,(char*)response.dump().data());
-            }else{
-                reading = false;
-            }
         }
-    }else
+
+        if (!reading)
+        {
+            strcpy(res, (char *)response.dump().data());
+        }
+        else
+        {
+            reading = false;
+        }
+
+    }
+    else
     {
-        strcpy(res,msg);
+        strcpy(res, msg);
     }
     return res;
 }
@@ -226,30 +224,35 @@ FS_CONNECTOR::~FS_CONNECTOR()
 
 int main(int argc, char *argv[])
 {
-    //argv[0] is the name of the filesytem
-    //argv[1] is the flag "new filesystem" and it can be 0 or 1
+    // argv[0] is the name of the filesytem
+    // argv[1] is the flag "new filesystem" and it can be 0 or 1
     string help = "usage ./fs filesytem.dat [0 or 1 | open or create]\n*\n*";
-    ::system ("clear");
+    ::system("clear");
     int port = 230;
     int buff_size = 4096;
     char msg[buff_size]; // message is 4096 bytes long
-    try{
-        if(!argv[1] || !argv[2]) throw help;
+    try
+    {
+        if (!argv[1] || !argv[2])
+            throw help;
         string filename = argv[1];
-        cout<<(!(argv[2])[1] && (argv[2])[0] == '0' ? "Opening" : "Creating")<<" filesytem in "<<filename<<""<<endl;
-        
+        cout << (!(argv[2])[1] && (argv[2])[0] == '0' ? "Opening" : "Creating") << " filesytem in " << filename << "" << endl;
+
         FS_CONNECTOR FS_C = FS_CONNECTOR(filename);
-        if((argv[2])[0] != '0'){
+        if ((argv[2])[0] != '0')
+        {
             FileSystem FS(filename);
             FS.Create_New_FS(filename);
             FS.disk.close();
-        }else{
+        }
+        else
+        {
             ifstream file;
             file.open(argv[1]);
             string f = argv[1];
             f.append(": No such file or directory");
-            if(!file) throw f;
-            
+            if (!file)
+                throw f;
         }
         // setup a socket and connection tools
         sockaddr_in servAddr;
@@ -290,9 +293,8 @@ int main(int argc, char *argv[])
         cout << "Connected with the shell!" << endl;
         while (1)
         {
-            memset(&msg, 0, sizeof(msg));              // clear the buffer
-            int n_bytes = recv(newSd, msg, buff_size, 0); // receives message
-            cout<<"Received: "<<n_bytes<<endl;
+            memset(&msg, 0, buff_size);                            // clear the buffer
+            int n_bytes = recv(newSd, (char *)&msg, buff_size, 0); // receives message
 
             if (!strcmp(msg, "exit"))
             {
@@ -305,44 +307,45 @@ int main(int argc, char *argv[])
                 send(newSd, (char *)&msg, strlen(msg), 0);
                 break;
             }
-            else if (n_bytes != 0)
+            else if (n_bytes > 0)
             {
-                if(FS_C.writing){
-                    cout << "Request:[data]"<<endl;
-                }else{
-                    cout << "Request:"<<msg<<endl;
+                cout << "Received: " << n_bytes << endl;
+                if (FS_C.writing)
+                {
+                    cout << "Request:[data]" << endl;
+                }
+                else
+                {
+                    cout << "Request:" << msg << endl;
                 }
 
-                char*result_=FS_C.execute(msg,newSd);
-                memset(&msg, 0, sizeof(msg)); // clear the buffer
-                strcpy(msg, result_); // message handler
-                
+                char *result_ = FS_C.execute(msg, newSd);
+                memset(&msg, 0, buff_size); // clear the buffer
+                strcpy(msg, result_);       // message handler
+
                 int numberOfBytesSent;
-                if(FS_C.n_of_bytes_reading > 0){
-                    cout << FS_C.n_of_bytes_reading<<": Response:";
-
-                    int i = 0;
-                    while(i < FS_C.n_of_bytes_reading ){
-                        cout<<result_[i];
-                        i++;
-                    }
-                    cout<<endl;
+                if (FS_C.n_of_bytes_reading > 0)
+                {
+                    cout << "Response:[data]" << endl;
                     numberOfBytesSent = send(newSd, result_, FS_C.n_of_bytes_reading, 0); // sends response
-
-                }else{
-                    cout <<"Response:"<<msg<<endl;
+                    FS_C.n_of_bytes_reading = 0;
+                }
+                else
+                {
+                    cout << "Response:" << msg << endl;
                     numberOfBytesSent = send(newSd, msg, strlen(msg), 0); // sends response
                 }
 
-                cout<<"bytes sent:"<<numberOfBytesSent<<endl;
+                cout << "bytes sent:" << numberOfBytesSent << endl;
             }
         }
 
-        
         close(newSd);
         close(serverSd);
-    }catch(string e){
-        cout<<"*\n*\n./fs: "<<e<<endl;
+    }
+    catch (string e)
+    {
+        cout << "*\n*\n./fs: " << e << endl;
     }
     return 0;
 }

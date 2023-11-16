@@ -2,8 +2,9 @@
 // Shell side
 //******************************************************************************
 
-Shell::Shell(string serverIp, int port)
+Shell::Shell(string serverIp, int port,int buffer)
 {
+    this->std_buffer = buffer;
     this->serverIp = &serverIp[0];
     this->port = port;
     this->curDir = "/";
@@ -14,27 +15,13 @@ Shell::~Shell()
 {
 }
 
-char* appendCharToCharArray(char* array, char a)
-{
-    size_t len = strlen(array);
-
-    char* ret = new char[len+2];
-
-    strcpy(ret, array);    
-    ret[len] = a;
-    ret[len+1] = '\0';
-
-    return ret;
-}
-
 //******************************************************************************
-
 
 /*Johnny*/
 // Splits the char* line with the string splitter
-char **line_splitter(char *line, string splitter)
+char **Shell::line_splitter(char *line, string splitter)
 {
-    int bufsize = 4096, position = 0;
+    int bufsize = std_buffer, position = 0;
     char **tokens = (char **)malloc(bufsize);       // what holds our tokens
     char *token = ::strtok(line, splitter.c_str()); // put tokenized values in tokens
     while (token != NULL)
@@ -44,7 +31,7 @@ char **line_splitter(char *line, string splitter)
 
         if (position >= bufsize)
         { // expand buffer if needed
-            bufsize += 4096;
+            bufsize += std_buffer;
             tokens = (char **)realloc(tokens, bufsize);
         }
 
@@ -57,7 +44,7 @@ char **line_splitter(char *line, string splitter)
 //******************************************************************************
 
 // Get the mode string, and returns type and permissions properly
-string format_mode(string mode)
+string Shell::format_mode(string mode)
 {
     char* mode_array = new char[17]; 
     strcpy(mode_array, mode.c_str());
@@ -101,7 +88,7 @@ string format_mode(string mode)
 
 //******************************************************************************
 
-string get_parent_path(string path){
+string Shell::get_parent_path(string path){
     int i = 0;
     int dircount = 0;
     string ans;
@@ -109,7 +96,7 @@ string get_parent_path(string path){
         ans = path;
     }else{
 
-    char **ss = ::line_splitter((char*)path.data(), "/");
+    char **ss = line_splitter((char*)path.data(), "/");
     while(ss[i]){
         dircount++;
         i++;
@@ -128,7 +115,7 @@ string get_parent_path(string path){
 //******************************************************************************
 
 // Gets the raw path passed by the user and return its absolute path
-string to_abspath(string curDir, string raw){
+string Shell::to_abspath(string curDir, string raw){
     int dotcounts = 0;
 	int parentcounts = 0;
     int i = 0;
@@ -136,11 +123,11 @@ string to_abspath(string curDir, string raw){
     string ans;
     if(raw.at(0) == '/'){
         //just skip to end
-	ans = raw;
+	    ans = raw;
     } else{
         //split raw up and curDir up, then find out how many .. are included in raw
-        char **ss = ::line_splitter((char*)raw.data(), "/");
-        char **abs = ::line_splitter((char*)curDir.data(), "/");
+        char **ss = line_splitter((char*)raw.data(), "/");
+        char **abs = line_splitter((char*)curDir.data(), "/");
 
         while(ss[i]) {
             if((strcmp(ss[i],"..")) == 0){
@@ -184,61 +171,69 @@ string to_abspath(string curDir, string raw){
     return ans;
 }
 
-char *Shell::request(json req_json, char* buffer)
+//******************************************************************************
+
+//Request for normal json
+json Shell::request(json req_json)
 {
-    int size = 4096;
+    int size = std_buffer;
 
     char req[size];
     req_json["user"] = user;
     string req_ = req_json.dump();
-    memset(&req, 0, sizeof(req)); // clear the buffer
+    memset(&req, 0, size); // clear the buffer
     strcpy(req, req_.c_str());
     int sent_bytes = send(clientSd, (char *)&req, strlen(req), 0);
+    memset(&req, 0, size); // clear the buffer
+    int received_bytes = recv(clientSd, (char *)&req, size, 0);
+
+    return json::parse((string)req);
+}
+
+//******************************************************************************
+
+//Request for writing data to the FS
+int Shell::request_write(json req_json, char* buffer)
+{
+    int size = int(req_json["nBytes"]);
+    char req[size];
+    memset(&req, 0, size); // clear the buffer
+
+    request(req_json);
+
+    int i = 0;
+    while(size >= i){
+        req[i] = buffer[i];
+        i++;
+    }
+
+    int sent = send(clientSd, (char *)&req, size, 0);
+    memset(&req, 0, size); // clear the buffer
+    int received = recv(clientSd, (char *)&req,std_buffer, 0);
+    return sent;
+}
+
+//******************************************************************************
+
+//Request for reading data to the FS (returns the number of ytes received)
+int Shell::request_read(json req_json,char* &res)
+{
+    int size = (int)req_json["nBytes"];
+    char req[std_buffer];
+    req_json["user"] = user;
+    string req_ = req_json.dump();
     memset(&req, 0, sizeof(req)); // clear the buffer
+    strcpy(req,req_.c_str());
 
-    //cout<<sent_bytes<<'|'<<strlen(req)<<'|'<<req_.length()<<endl;
-
-
-    int received_bytes;
-    if(req_json["call"] == "my_read"){
-        size = int(req_json["nBytes"]);
-        received_bytes = recv(clientSd, (char *)&req, size, 0);
-        cout<<received_bytes<<endl;
-
-        int i = 0;
-        while(i<received_bytes){
-            //res[i] = req[i];
-            cout<<"|"<<req[i];
-            i++;
-        }
-    }else{
-        received_bytes = recv(clientSd, (char *)&req, sizeof(req), 0);
-    }
-
-    if(buffer != NULL){
-        //memset(&req, 0, size); // clear the buffer
-
-        size = int(req_json["nBytes"]);
-        char req_buffer[size];
-        int i = 0;
-        while(size >= i){
-            req_buffer[i] = buffer[i];
-            //cout<<buffer[i];
-            i++;
-        }
-        send(clientSd, (char *)&req_buffer, size, 0);
-        memset(&req_buffer, 0, sizeof(req_buffer)); // clear the buffer
+    int sent_bytes = send(clientSd, (char *)&req, strlen(req), 0);
         
-        memset(&req, 0, sizeof(req)); // clear the buffer
-        recv(clientSd, (char *)&req, sizeof(req), 0);
+    memset(&req, 0, std_buffer); // clear the buffer
 
-    }
-   
+    int received = recv(clientSd, (char *)&req, size, 0);
+    
+    cout<<req<<endl;
 
-
-        char *res = new char[size];
-        strcpy(res,req);
-        return res;
+    return received;
 }
 
 //******************************************************************************
@@ -247,21 +242,24 @@ void Shell::build_ls(json callResponses,char* r){
         // Verifies if the my_getPerm received true or false
         // Starts to go over all entries in the i-node
         int count = 0;
-        r = request({{"call","get_block_use"},{"inodeNumber",callResponses[0]["inodeNumber"]}});
-        json res = json::parse((string)r);
+        json res = request({{"call","get_block_use"},{"inodeNumber",callResponses[0]["inodeNumber"]}});
+
         cout<<"total "<<res["blockuse"]<<endl;
-        while (1)
+
+        bool run = true;
+        while (run)
         {
             json file_data = {{}};
             json readDirForm = {
                 {"call", "my_read_dir"}, // get name, type, inodenumber
                 {"inodeNumber", callResponses[0]["inodeNumber"]},
                 {"position", count}};
-            r = request(readDirForm);
-            json readDirRes = json::parse((string)r);
-            count = count == readDirRes["nextPos"]? (-1) : (int)readDirRes["nextPos"];
+            json readDirRes = request(readDirForm);
 
-            if (count == -1) break;
+            if(readDirRes["nextPos"] == -1) break;
+            if (count == readDirRes["nextPos"]) run = false;
+
+            count = readDirRes["nextPos"];
 
             json fileRequestForms = {
                 {{"call", "my_Read_Mode"}, /* Get Type and permissions*/},
@@ -274,9 +272,8 @@ void Shell::build_ls(json callResponses,char* r){
             for (int i = 0; i < fileRequestForms.size(); i++)
             {
                 fileRequestForms[i]["inodeNumber"] = readDirRes["inodeNumber"];
-                r = request(fileRequestForms[i]);
+                file_data[i] = request(fileRequestForms[i]);
                 // cout<<r<<endl;
-                file_data[i] = json::parse((string)r);
             }   
 
 
@@ -285,6 +282,7 @@ void Shell::build_ls(json callResponses,char* r){
             string rmt_s = r_MTime;
             rmt_s.pop_back();
 
+            cout << readDirRes["inodeNumber"] << "    ";
             cout << format_mode(file_data[0]["mode"]);
             cout << "@ " << file_data[1]["nlinks"];
             cout << " " << file_data[2]["UID"];
@@ -293,6 +291,7 @@ void Shell::build_ls(json callResponses,char* r){
             cout << " " << rmt_s;
             cout << " " << std::string(readDirRes["name"]);
             cout << endl;
+
     }
 }
 
@@ -327,8 +326,7 @@ void Shell::my_ls(char **input)
         //Requests all the system calls on the list
         for (int i = 0; i < requestForms.size(); i++){
             requestForms[i]["path"] = pd;
-            r = request(requestForms[i]);
-            callResponses[i] = json::parse((string)r);
+            callResponses[i] = request(requestForms[i]);
         }
 
         //Verifies if the path exists
@@ -387,8 +385,7 @@ void Shell::my_cd(char **input)
         //Requests all the system calls on the list
         for (int i = 0; i < requestForms.size(); i++){
             requestForms[i]["path"] = pd;
-            r = request(requestForms[i]);
-            callResponses[i] = json::parse((string)r);
+            callResponses[i] = request(requestForms[i]);
         }
 
         //Verifies if the path exists
@@ -442,8 +439,7 @@ void Shell::my_mkdir(char **input)
 
             //Requests all the system calls on the list
             for (int i = 0; i < requestForms.size(); i++){
-                r = request(requestForms[i]);
-                callResponses[i] = json::parse((string)r);
+                callResponses[i]= request(requestForms[i]);
             }
 
             //Verifies if the path exists
@@ -476,7 +472,7 @@ void Shell::my_mkdir(char **input)
             json requestForm = {
                 {"call", "my_mkdir"},
                 {"path", pd}};
-            r = request(requestForm);
+            json res_json = request(requestForm);
 
         }else if(input[2]){
             throw "too many arguments!";
@@ -517,8 +513,7 @@ void Shell::my_Lcp(char **input)
         //Requests all the system calls on the list
         for (int i = 0; i < requestForms.size(); i++){
             requestForms[i]["path"] = pd;
-            r = request(requestForms[i]);
-            callResponses[i] = json::parse((string)r);
+            callResponses[i] = request(requestForms[i]);
         }
 
         switch (int(callResponses[1]["permission"]))
@@ -545,7 +540,7 @@ void Shell::my_Lcp(char **input)
         string path = to_abspath(curDir_m,input[2]);
         
         string path_2 = to_abspath(curDir,input[1]);
-        char **abs = ::line_splitter((char*)path_2.data(), "/");
+        char **abs = line_splitter((char*)path_2.data(), "/");
 
         string filename;
         int j = 0;
@@ -572,8 +567,7 @@ void Shell::my_Lcp(char **input)
             //Gets the size of the file
             json req = {{"call", "my_Read_Size"},
             {"inodeNumber",callResponses[0]["inodeNumber"]}};
-            char* size_res = request(req);
-            json size_res_json = json::parse((string)size_res);
+            json size_res_json = request(req);
             
             int count = 0;
             int buffer_s = 1024;
@@ -592,7 +586,8 @@ void Shell::my_Lcp(char **input)
                 {"nBytes",buffer_s},
                 {"size",size_res_json["size"]},
                 {"position",count}};
-                char* my_read_res = request(req);
+                char* my_read_res;
+                request_read(req,my_read_res);
                     
                 count += buffer_s;
                 final_.append(my_read_res);
@@ -604,100 +599,6 @@ void Shell::my_Lcp(char **input)
         }
     }catch(string e){
         cout<<"Icp: "<<e<<endl;
-    }
-}
-
-//******************************************************************************
-
-void Shell::my_cat(char **input){
-     string help = "usage: cat path/to/file";
-    bool rc = false;
-    char* r;
-    json callResponses = {{}};
-    
-    try{
-
-        if((!input[1] || input[2]) || (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
-            throw help;
-        }
-        // check permission that you are able to access that file
-        bool rc = false;
-        char* r;
-        json callResponses = {{}};
-        string pd = to_abspath(curDir,input[1]);
-        json requestForms = {
-            {{"call", "my_readPath"}},
-            {{"call", "my_getPerm"}},
-        };
-
-        //Requests all the system calls on the list
-        for (int i = 0; i < requestForms.size(); i++){
-            requestForms[i]["path"] = pd;
-            r = request(requestForms[i]);
-            callResponses[i] = json::parse((string)r);
-        }
-        
-
-        //Verifies if the path exists
-        if(callResponses[0]["inodeNumber"] == -1){
-            string g = pd;
-            g.append(": No such file or directory");
-            throw g;
-        }
-
-        switch (int(callResponses[1]["permission"]))
-            {
-            case 4:/* r-- */rc = true;break;
-            case 5:/* r-x */rc = true;break;
-            case 6:/* rw- */rc = true;break;
-            case 7:/* rwx */rc = true;break;
-            default:
-                string d = "ls: permission denied: ";
-                d.append(pd);
-                throw d;
-                break;
-            }
-
-        if(rc){
-            //Gets the size of the file
-            json req = {{"call", "my_Read_Size"},
-            {"inodeNumber",callResponses[0]["inodeNumber"]}};
-            char* size_res = request(req);
-            json size_res_json = json::parse((string)size_res);
-            
-            int count = 0;
-            int buffer_s = 1024;
-            //int buffer_s = size_res_json["size"];
-            //cout<<(int)size_res_json["size"]<<endl;
-            while(1){
-                if(count >= (int)size_res_json["size"]){
-                    break;
-                }
-                if((count+buffer_s) >= (int)size_res_json["size"]){
-                    buffer_s = (int)size_res_json["size"] - count;
-                }
-
-                json req = {{"call", "my_read"},
-                {"inodeNumber",callResponses[0]["inodeNumber"]},
-                {"nBytes",buffer_s},
-                {"size",size_res_json["size"]},
-                {"position",count}};
-                
-                request(req);
-                /*cout<<buffer_s<<endl;
-                int i = 0;
-                while(i <= buffer_s){
-                    cout<<res[i];
-                    i++;
-                }*/
-
-                count += buffer_s;
-                ///cout<<endl<<count<<" | "<<(int)size_res_json["size"]<<endl;
-            }
-                cout<<endl;
-        }
-    }catch(string e){
-        cout<<"cat: "<<e<<endl;
     }
 }
 
@@ -728,8 +629,7 @@ void Shell::my_Icp(char **input)
         //Requests all the system calls on the list
         for (int i = 0; i < requestForms.size(); i++){
             requestForms[i]["path"] = pd;
-            r = request(requestForms[i]);
-            callResponses[i] = json::parse((string)r);
+            callResponses[i]= request(requestForms[i]);
         }
 
         //Verifies if the path exists
@@ -776,7 +676,7 @@ void Shell::my_Icp(char **input)
                 char curDir_m[3000];
                 getcwd(curDir_m, 3000);
                 string path = to_abspath(curDir_m,input[1]);
-                char **abs = ::line_splitter((char*)path.data(), "/");
+                char **abs = line_splitter((char*)path.data(), "/");
 
                 string filename;
                 int j = 0;
@@ -795,8 +695,7 @@ void Shell::my_Icp(char **input)
                 path.append(filename);
 
                 json requestForm = {{"call", "my_create"},{"path",path}};
-                r = request(requestForm);
-                json my_create_res = json::parse((string)r);
+                json my_create_res = request(requestForm);
 
                 if(my_create_res["inodeNumber"] <= 0){
                     string g = "";
@@ -806,7 +705,7 @@ void Shell::my_Icp(char **input)
 
                 cout<<"Transfering file to FS...."<<endl;
 
-                int buf_size = 4096;
+                int buf_size = std_buffer;
                 int count = 0;
                 while(1){
                     
@@ -834,8 +733,7 @@ void Shell::my_Icp(char **input)
                     {"size",file_size},
                     {"inodeNumber",my_create_res["inodeNumber"]}};
 
-                    r = request(requestForm,buffer_piece);
-                    json my_write_res = json::parse((string)r);
+                    request_write(requestForm,buffer_piece);
                     count += buf_size;
 
                 }
@@ -866,6 +764,94 @@ void Shell::my_Icp(char **input)
     }
 
 }
+
+//******************************************************************************
+
+void Shell::my_cat(char **input){
+     string help = "usage: cat path/to/file";
+    bool rc = false;
+    char* r;
+    json callResponses = {{}};
+    
+    try{
+
+        if((!input[1] || input[2]) || (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }
+        // check permission that you are able to access that file
+        bool rc = false;
+        char* r;
+        json callResponses = {{}};
+        string pd = to_abspath(curDir,input[1]);
+        json requestForms = {
+            {{"call", "my_readPath"}},
+            {{"call", "my_getPerm"}},
+        };
+
+        //Requests all the system calls on the list
+        for (int i = 0; i < requestForms.size(); i++){
+            requestForms[i]["path"] = pd;
+            callResponses[i]= request(requestForms[i]);
+        }
+        
+
+        //Verifies if the path exists
+        if(callResponses[0]["inodeNumber"] == -1){
+            string g = pd;
+            g.append(": No such file or directory");
+            throw g;
+        }
+
+        switch (int(callResponses[1]["permission"]))
+            {
+            case 4:/* r-- */rc = true;break;
+            case 5:/* r-x */rc = true;break;
+            case 6:/* rw- */rc = true;break;
+            case 7:/* rwx */rc = true;break;
+            default:
+                string d = "ls: permission denied: ";
+                d.append(pd);
+                throw d;
+                break;
+            }
+
+        if(rc){
+            //Gets the size of the file
+            json req = {{"call", "my_Read_Size"},
+            {"inodeNumber",callResponses[0]["inodeNumber"]}};
+            json size_res_json = request(req);
+            
+            int count = 0;
+            int buffer_s = 1024;
+            //int buffer_s = size_res_json["size"];
+            //cout<<(int)size_res_json["size"]<<endl;
+            while(1){
+                if(count >= (int)size_res_json["size"]){
+                    break;
+                }
+                if((count+buffer_s) >= (int)size_res_json["size"]){
+                    buffer_s = (int)size_res_json["size"] - count;
+                }
+
+                json req = {{"call", "my_read"},
+                {"inodeNumber",callResponses[0]["inodeNumber"]},
+                {"nBytes",buffer_s},
+                {"size",size_res_json["size"]},
+                {"position",count}};
+                
+                char* block_received = new char[buffer_s];
+                int size_ = request_read(req,block_received);
+                
+                count += buffer_s;
+                ///cout<<endl<<count<<" | "<<(int)size_res_json["size"]<<endl;
+            }
+                cout<<endl;
+        }
+    }catch(string e){
+        cout<<"cat: "<<e<<endl;
+    }
+}
+
 //******************************************************************************
 
 /*Function will be called in the main function every time a new message
@@ -905,8 +891,8 @@ int main(int argc, char *argv[])
 {
     string help = "usage ./shell [0, 1 or 2 for the user to be used]\n*\n*";
     ::system ("clear");
-    Shell shell = Shell("127.0.0.1", 230);
-    char msg[4096];
+    Shell shell = Shell("127.0.0.1", 230, 4096);
+    char msg[shell.std_buffer];
     json users = {0,0,1};
 
 

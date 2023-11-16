@@ -1,5 +1,5 @@
 all: makefile
 
 makefile: shell.h _tcp_fs.h shell.cpp fs.cpp ../Read-Write.cpp
-	g++ -std=c++11 ../Read-Write.cpp fs.cpp -o fs -funsigned-char
-	g++ -std=c++11 shell.cpp -o shell
+	g++ -std=c++11 ../Read-Write.cpp fs.cpp -o fs -funsigned-char -Wc++11-inline-namespace
+	g++ -std=c++11 shell.cpp -o shell -Wc++11-inline-namespace
