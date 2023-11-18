@@ -36,6 +36,7 @@ void FileSystem::createDataFile(unsigned int size, string name) {
 //******************************************************************************
 
 char* FileSystem::readBlock(int blockNumber) {
+
     char* dataBlock;
     if (blockNumber >= 0 && blockNumber <= MAXBLOCKS) {
         dataBlock = new char [BLOCKSIZE];
@@ -68,6 +69,7 @@ void FileSystem::writeBlock(int blockNumber, char* data) {
 
 FileSystem::FileSystem(string name) {
     disk.open(name, ios::out | ios::in | ios::binary);
+    FileName = name;
 }
 
 //******************************************************************************
@@ -846,7 +848,6 @@ bool FileSystem::my_extend(int inodeNumber) {
     }
     //cout << "extend 9" << endl;
     return rc;
-
 }
 
 //******************************************************************************
@@ -864,7 +865,6 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
     //if (IDNum == 0) {
         //If it doesn't, then create it.
         indirectBlock = single_Allocate();
-        //cout << "single allocate " << indirectBlock << endl;
         if (indirectBlock != 0) {
             char* buffer = readBlock(indirectBlock);
             for (int i = 0; i < 4096; i++) {
@@ -883,6 +883,7 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
         }
         //cout << "does not exist" << endl;
     } else { //It does exist
+
         //cout << "does exist" << endl;
         char cIndirectBlock[4];
         cIndirectBlock[0] = block[location];
@@ -890,7 +891,6 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
         cIndirectBlock[2] = block[location + 2];
         cIndirectBlock[3] = block[location + 3];
         indirectBlock = characters_To_Integer(cIndirectBlock);
-        //cerr << "indirectBlock exist " << indirectBlock << endl;
         //cerr << "location " << location << endl;
 
     }
@@ -977,6 +977,7 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
 
     char cAddress[4];
     int address;
+
     //Search the normal addresses in the inode.
     for (int i = 0; i < 12; i++) {
         cAddress[0] = buffer[offset + i * 4];
@@ -996,19 +997,21 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
             break;
         }
     }
-
     //Search the first indirect block
     if (!found) {
         found = my_Add_Address_Indirect(buffer, location[1] + 67, blockNumber, full);
         writeBlock(location[0], buffer);
         //cout << characters_To_Integer(&buffer[(location[1] + 67)]) << endl;
     }
+
     //Search the double indirect block
     if (!found && !full) {
+
         found = my_Add_Address_DIndirect(buffer, location[1] + 71, blockNumber, full);
         //cout << "last" << endl;
         writeBlock(location[0], buffer);
     }
+
     //Seaerch the triple indirect block
     if (!found && !full) {
         int TIndirect;
@@ -1057,6 +1060,7 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
     if (full) { //Should already be true, but made it explicit.
         found = false;
     }
+    
     delete location, buffer;
     return found;
 }
@@ -1097,10 +1101,10 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
         //}
         //Double indirect block
         result = new int[1024];
-        cerr << "is this it" << endl;
+        //?cerr << "is this it" << endl;
         char* DIBuffer = readBlock(characters_To_Integer(&buffer[71 + offset]));
-        cerr << "DI offset " << indirect_block - 2 << endl;
-        cerr << "\n DI number " << characters_To_Integer(&DIBuffer[(indirect_block - 2) * 4]) << endl;
+        //?cerr << "DI offset " << indirect_block - 2 << endl;
+        //?cerr << "\n DI number " << characters_To_Integer(&DIBuffer[(indirect_block - 2) * 4]) << endl;
         char* IBuffer = readBlock(characters_To_Integer(&DIBuffer[(indirect_block - 2) * 4]));
         for (int i = 0; i < 1024; i++) {
             result[i] = characters_To_Integer(&IBuffer[i * 4]);
@@ -1184,43 +1188,52 @@ bool FileSystem::add_entry_to_block(int blockNumber, int entryInodeNum, string n
         delete cEntryInode, cNextEntry, mode, modeBits;
     } else {
         //If this block already has entries
+        //cout << "\n";
         while (position < 4096) {
+            //cout << "read offset " << characters_To_Integer(&buffer[4 + position]) << endl;
             nextEntry = position + characters_To_Integer(&buffer[4 + position]);
+            //cout << "next Entry " << nextEntry << endl;
             entryEnd = position + (int)buffer[9 + position] + 10;
+            //cout << "entry end "  << entryEnd << endl;
+
             //EntryEnd is an index that points to the first free space after the entry
             // at the current position.
             //cout << "nextEntry " << nextEntry << "entryEnd" << entryEnd << endl;
+            //?cout << "entry difference " << nextEntry - entryEnd << endl;
             if (nextEntry - entryEnd >= newEntrySize) {
                 //Record i-node
                 char* cEntryInode = integer_To_Characters(entryInodeNum);
-                buffer[position + entryEnd] = cEntryInode[0];
-                buffer[position + entryEnd + 1] = cEntryInode[1];
-                buffer[position + entryEnd + 2] = cEntryInode[2];
-                buffer[position + entryEnd + 3] = cEntryInode[3];
+                buffer[entryEnd] = cEntryInode[0];
+                buffer[entryEnd + 1] = cEntryInode[1];
+                buffer[entryEnd + 2] = cEntryInode[2];
+                buffer[entryEnd + 3] = cEntryInode[3];
 
                 //Set my->next = prev->next
                 //Get the index of the next entry and subtrack position from it to get the offset.
                 //Then subtract the length of the previous entry from the offset to get the new offset.
-                char* cNextEntry = integer_To_Characters((nextEntry - position) - (entryEnd));
-                buffer[position + entryEnd + 4] = cNextEntry[0];
-                buffer[position + entryEnd + 5] = cNextEntry[1];
-                buffer[position + entryEnd + 6] = cNextEntry[2];
-                buffer[position + entryEnd + 7] = cNextEntry[3];
+                char* cNextEntry = integer_To_Characters((nextEntry - entryEnd)); // I think position should be removed
+                //?cout << "New offset " << (nextEntry - entryEnd) << endl;
+                buffer[entryEnd + 4] = cNextEntry[0];
+                buffer[entryEnd + 5] = cNextEntry[1];
+                buffer[entryEnd + 6] = cNextEntry[2];
+                buffer[entryEnd + 7] = cNextEntry[3];
 
                 //Store mode
                 char* mode = my_Read_Mode(entryInodeNum);
                 bool* modeBits = character_To_Binary(mode[0]);
                 if (!modeBits[0] && !modeBits[0]) {
-                    buffer[position + entryEnd + 8] = 'n';
+                    buffer[entryEnd + 8] = 'n';
                 } else if (!modeBits[0] && modeBits[1]) {
-                    buffer[position + entryEnd + 8] = 'd';
+                    buffer[entryEnd + 8] = 'd';
                 }
 
                 //Store name length.
-                buffer[position + entryEnd + 9] = (char)name.length();
+                //?cerr << "Name length stored " << name.length() + position + 10 << endl;
+                buffer[entryEnd + 9] = (char)name.length();
 
+                //?cout << "Pre offset updated " << entryEnd << endl;
                 //Previous->next = me
-                char* cUpdateNextEntry = integer_To_Characters(entryEnd);
+                char* cUpdateNextEntry = integer_To_Characters(entryEnd - position);
                 buffer[position + 4] = cUpdateNextEntry[0];
                 buffer[position + 5] = cUpdateNextEntry[1];
                 buffer[position + 6] = cUpdateNextEntry[2];
@@ -1228,7 +1241,7 @@ bool FileSystem::add_entry_to_block(int blockNumber, int entryInodeNum, string n
 
                 //Writes the name. Assumes name <= 255 characters
                 for (int i = 0; i < name.length(); i++) {
-                    buffer[position + entryEnd + i + 10] = name[i];
+                    buffer[entryEnd + i + 10] = name[i];
                 }
 
                 result = true;
@@ -1276,7 +1289,6 @@ void FileSystem::my_write_dir(int directoryInodeNum, int entryInodeNum, string n
             my_Set_Size(directoryInodeNum, my_Read_Size(directoryInodeNum) + 8 * 4096); //The size of the directory could be off if extend quietly fails
             delete blockNums;
             blockNums = get_addresses(directoryInodeNum, 0);
-
         }
         placedEntry = add_entry_to_block(blockNums[i], entryInodeNum, name);
         if (placedEntry) {
@@ -1759,7 +1771,6 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
     //cout << "number of blocks " << numberOfBlocks << endl;
     //cout << "start block " << startBlock << endl;
 	if (success) {
-        cerr << "ran" << endl;
 	
         /*
 		if (start != 0) {
@@ -1952,7 +1963,8 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
-    createDataFile(1024 * 1024 * 32, name);
+    createDataFile(1024 * 1024 * 16, name);
+    FileName = name;
     char* buffer;
 
     //Mark 0-1041 as used on the block bitmap
