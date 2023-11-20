@@ -177,7 +177,12 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
             }
             else if (request["call"] == "my_remove_entry")
             {
-                request["status"] = FS.my_remove_entry(request["inodeNumber"], 0);
+                response["status"] = FS.my_remove_entry(request["inodeNumber"], 0);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_rmdir")
+            {
+                response["status"] = FS.my_rmdir(request["path"]);
                 //******************************************************************************
             }
             else

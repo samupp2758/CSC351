@@ -69,7 +69,7 @@ void FileSystem::writeBlock(int blockNumber, char* data) {
 
 FileSystem::FileSystem(string name) {
     disk.open(name, ios::out | ios::in | ios::binary);
-    FileName = name;
+    //FileName = name;
 }
 
 //******************************************************************************
@@ -1964,7 +1964,7 @@ int FileSystem::my_create(string path, int user, int group) {
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
     createDataFile(1024 * 1024 * 16, name);
-    FileName = name;
+    //FileName = name;
     char* buffer;
 
     //Mark 0-1041 as used on the block bitmap

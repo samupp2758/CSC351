@@ -282,7 +282,6 @@ void Shell::build_ls(json callResponses,char* r){
             string rmt_s = r_MTime;
             rmt_s.pop_back();
 
-            cout << readDirRes["inodeNumber"] << "    ";
             cout << format_mode(file_data[0]["mode"]);
             cout << "@ " << file_data[1]["nlinks"];
             cout << " " << file_data[2]["UID"];
@@ -421,22 +420,72 @@ void Shell::my_cd(char **input)
 void Shell::my_rmdir(char **input)
 {    
 
-    string help = "usage: rmdir path/to/directory";
-    char *r; //Request
-    json r_j;
-    json p_r;
-    string pd;
-    bool rc = false;
-    json callResponses = {{}};
-    json requestForms = {
-        {{"call", "my_readPath"}},
-        {{"call", "my_getPerm"}},
-    };
-
+     string help = "usage: rmdir path/to/directory";
     try{
+        if(input[1] && (input[1][0] == '-' || !strcmp(input[1],"--help") || !strcmp(input[1],"-h"))){
+            throw help;
+        }
+        //Verify if the input[1] is empty
+        if(input[1] && !input[2]){
+            char *r; //Request
+            bool rc = false;
+            json callResponses = {{}};
+            string pd = to_abspath(curDir,input[1]);
+            json requestForms = {
+                {{"call", "my_readPath"},{"path",get_parent_path(pd)}},
+                {{"call", "my_readPath"},{"path",pd}},
+                {{"call", "my_getPerm"},{"path",get_parent_path(pd)}},
+            };
 
+            //Requests all the system calls on the list
+            for (int i = 0; i < requestForms.size(); i++){
+                callResponses[i]= request(requestForms[i]);
+            }
+
+            //Verifies if the path exists
+            if(callResponses[0]["inodeNumber"] == -1){
+                string g = requestForms[0]["path"];
+                g.append(": No such file or directory");
+                throw g;
+            }
+
+            if(callResponses[1]["inodeNumber"] == -1){
+                string g = requestForms[1]["path"];
+                g.append(": Directory doesn't exist");
+                throw g;
+            }
+                
+            //Check permissions for rmdir (just needs write)
+            switch (int(callResponses[2]["permission"]))
+                {
+                case 2:/* -w- */rc = true;break;
+                case 3:/* -wx */rc = true;break;
+                case 6:/* rw- */rc = true;break;
+                case 7:/* rwx */rc = true;break;
+                default:
+                    string g = requestForms[0]["path"];
+                    g.append(": Permission denied");
+                    throw g;
+                    break;
+                }
+
+            json requestForm = {
+                {"call", "my_rmdir"},
+                {"path", pd}};
+            json res_json = request(requestForm);
+
+            if(!res_json["status"]){
+                string g = "Directory is not empty";
+                throw g;
+            }
+
+        }else if(input[2]){
+            throw "too many arguments!";
+        }else{
+            throw help;
+        }
     }catch(string e){
-        cout<<"rmdir: "<<e<<endl;
+            cout<<"rmdir: "<<e<<endl;
     }
 }
 
