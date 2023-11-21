@@ -1553,11 +1553,9 @@ bool FileSystem::my_rmdir(string path) {
     char throwAwayC;
     myInodeNum = my_readPath(path, parInodeNum, name);
     int isEmpty = my_read_dir(myInodeNum, 0, throwAwayI, throwAwayS, throwAwayC);
-    cout << "is empty " << isEmpty << endl;
     if (isEmpty == -1) {
         int position = my_search_dir(parInodeNum, name);
         //cout << "\nposition remove " << position << endl;
-        cout << "position " << position << endl;
         if (position != -1) {
             my_remove_entry(parInodeNum, position);
             success = true;
