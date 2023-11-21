@@ -55,7 +55,7 @@ using namespace std;
 
             //TCP REQUEST-RESPONSE FUNCTIONS
             json request(json req_json);
-            int request_write(json req_json,char* buffer);
+            int request_write(json req_json,char* buffer); //
             int request_read(json req_json,char* &res);
             
             //COMMAND MAIN CONTROLLER

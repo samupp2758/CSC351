@@ -580,7 +580,7 @@ void Shell::my_Lcp()
 
 void Shell::my_Icp()
 {
-    string help = "usage: Icp machine/source filesystem/destination";
+    string help = "usage: Icp machine/source filesystem/destination, [currently, the file on the destination has the same name as the machine]";
     string source_path;
     string destination_path;
     int destination_inode_number;
@@ -611,7 +611,7 @@ void Shell::my_Icp()
     destination_path = to_abspath(curDir, currentCommand[2]);
 
     // Verifies if the user has permission to Icp (just write)
-    testPermissions(get_parent_path(destination_path), false, false, true);
+    testPermissions(destination_path, false, false, true);
 
     file.open(source_path, ios::in | ios::binary);
 
@@ -694,7 +694,7 @@ void Shell::my_Icp()
 
         if (successful)
         {
-            cout << "Success! File " << source_filename << endl;
+            cout << "Success! File " << source_filename <<" created"<< endl;
         }
         else
         {
