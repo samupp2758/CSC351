@@ -1342,13 +1342,15 @@ int FileSystem::my_remove_entry(int directoryInodeNum, int position) {
     int result = position;
 
     //cout << "blockNumber: " << blockNums[(position/4096)%1024] << endl;
-    my_Decrement_nlinks(characters_To_Integer(&buffer[0]));
+    my_Decrement_nlinks(characters_To_Integer(&buffer[position]));
     my_Set_MTime(directoryInodeNum);
 
     //There was no entry in the block
     if (offset == 0 && !buffer[4] && !buffer[5] && !buffer[6] && !buffer[7]) {
+
         result = -1;
-    } else if (offset == 0 && characters_To_Integer(&buffer[4])) {
+    } else if (offset == 0 && characters_To_Integer(&buffer[4]) == 4096) {
+
         //If removing the first entry of a block with a single entry
         for (int i = 4; i < 8; i++) {
             buffer[i] = 0;
@@ -1468,7 +1470,7 @@ int FileSystem::my_search_dir(int dirInode, string name, int& inodeNum) {
 }
 
 //******************************************************************************
-
+//Returns the position of the desired entry, -1 otherwise.
 int FileSystem::my_search_dir(int dirInode, string name) {
     int num;
     return my_search_dir(dirInode, name, num);
@@ -1525,6 +1527,7 @@ int FileSystem::my_readPath(string path) {
 
 //******************************************************************************
 //Somewhat tested
+//Returns the i-node number of the created directory.
 int FileSystem::my_mkdir(string path, int user, int group) {
     char mode[2] = {125, 160};
     int myInodeNum = create_inode(mode, user, group);
@@ -1550,9 +1553,11 @@ bool FileSystem::my_rmdir(string path) {
     char throwAwayC;
     myInodeNum = my_readPath(path, parInodeNum, name);
     int isEmpty = my_read_dir(myInodeNum, 0, throwAwayI, throwAwayS, throwAwayC);
+    cout << "is empty " << isEmpty << endl;
     if (isEmpty == -1) {
         int position = my_search_dir(parInodeNum, name);
         //cout << "\nposition remove " << position << endl;
+        cout << "position " << position << endl;
         if (position != -1) {
             my_remove_entry(parInodeNum, position);
             success = true;
@@ -1963,7 +1968,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     //createDataFile(pow(2, 31), name);
-    createDataFile(1024 * 1024 * 16, name);
+    createDataFile(1024 * 1024 * 8, name);
     //FileName = name;
     char* buffer;
 
