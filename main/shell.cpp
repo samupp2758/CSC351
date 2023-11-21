@@ -596,7 +596,7 @@ void Shell::my_Icp()
     getcwd(curDir_machine, 3000);
 
     // Sees if there is any missing or overflowing args
-    if (!currentCommand[2] || !currentCommand[1])
+    if (!currentCommand[2])
     {
         throw ERROR_args_missing;
     }
@@ -610,7 +610,7 @@ void Shell::my_Icp()
     source_path = to_abspath(curDir_machine, currentCommand[1]);
     destination_path = to_abspath(curDir, currentCommand[2]);
 
-    // Verifies if the user has permission to Icp (just write)
+    // Verifies if the user has permission to Icp (just execute)
     testPermissions(destination_path, false, false, true);
 
     file.open(source_path, ios::in | ios::binary);
@@ -642,6 +642,10 @@ void Shell::my_Icp()
         }
 
         // Inserts in to the destination path
+        if(destination_path != "/"){
+            destination_path.append("/");
+        }
+
         destination_path.append(source_filename);
 
         // Creates the destination path (file)
