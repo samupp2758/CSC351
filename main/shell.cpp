@@ -245,6 +245,30 @@ int Shell::testPath(string path, bool noThrow)
 
 //******************************************************************************
 
+/*Tests to see if the path points to a directory or not*/
+bool Shell::testDirectory(string path, bool noThrow)
+{
+    int inodeNumber = testPath(path);
+    bool rc = false;
+
+    json mode_res = request({{"call", "my_Read_Mode"}, {"inodeNumber", inodeNumber}});
+    string mode_pretty = format_mode(mode_res["mode"]);
+    if (mode_pretty[0] != 'd')
+    {
+        if (!noThrow)
+        {
+            throw ERROR_not_a_dir;
+        }
+    }
+    else
+    {
+        rc = true;
+    }
+    return rc;
+}
+
+//******************************************************************************
+
 /*Test permissions will receive a absolute path, and will verify if you can
 or not read (if you need to read, send read as true, if not, false, same thing
 for write and execute)*/
@@ -472,15 +496,7 @@ void Shell::my_cd()
     // Gets the directory passed by the client or sends the client to root
     dir = (currentCommand[1] ? to_abspath(curDir, currentCommand[1]) : root);
 
-    int inodeNumber = testPath(dir);
-
-    // Verifying if the path is to a directory
-    json mode_res = request({{"call", "my_Read_Mode"}, {"inodeNumber", inodeNumber}});
-    string mode_pretty = format_mode(mode_res["mode"]);
-    if (mode_pretty[0] != 'd')
-    {
-        throw ERROR_not_a_dir;
-    }
+    testDirectory(dir);
 
     testPermissions(dir, false, false, true);
 
@@ -642,7 +658,8 @@ void Shell::my_Icp()
         }
 
         // Inserts in to the destination path
-        if(destination_path != "/"){
+        if (destination_path != "/")
+        {
             destination_path.append("/");
         }
 
@@ -698,7 +715,7 @@ void Shell::my_Icp()
 
         if (successful)
         {
-            cout << "Success! File " << source_filename <<" created"<< endl;
+            cout << "Success! File " << source_filename << " created" << endl;
         }
         else
         {
@@ -779,7 +796,90 @@ void Shell::my_cat()
 void Shell::my_cp()
 {
     string help = "usage: cp source destination";
+    string source;
+    string destination;
+    int destination_inode_number;
+    int source_inode_number;
+
     handleSeekHelp(help);
+
+    if (!currentCommand[2])
+    {
+        throw ERROR_args_missing;
+    }
+
+    if (currentCommand[3])
+    {
+        throw ERROR_args_overflow;
+    }
+
+    // Gets their absolute path
+    source = to_abspath(curDir, currentCommand[1]);
+    destination = to_abspath(curDir, currentCommand[2]);
+
+    // Test if they exist, source must exist at all costs
+    source_inode_number = testPath(source);
+    destination_inode_number = testPath(destination, true);
+
+    // Tests if destinations parent exists (if not even its parents exists, throw error)
+    testPath(get_parent_path(destination));
+
+    // See if we can copy from source
+    testPermissions(source, true, false, false);
+
+    // If the destination didn't exist before, creates it
+    if (destination_inode_number == -1 && !testDirectory(source, true))
+    {
+        json create_dest_path_res = request({{"call", "my_create"}, {"path", destination}});
+        destination_inode_number = create_dest_path_res["inodeNumber"];
+
+        if (destination_inode_number == -1)
+        {
+            throw ERROR_file_not_created;
+        }
+    }
+
+    if(testDirectory(source, true)){
+       json requestForm = {
+        {"call", "my_mkdir"},
+        {"path", destination}};
+        json res_json = request(requestForm); 
+        destination_inode_number = testPath(destination);
+    }
+    else if (testDirectory(destination, true))
+    {
+        char **source_path_splitted = line_splitter((char *)source.data(), "/");
+        string source_filename;
+        int j = 0;
+        while (source_path_splitted[j])
+        {
+            source_filename = source_path_splitted[j];
+            j++;
+        }
+
+        // Inserts in to the destination path
+        if (destination != "/")
+        {
+            destination.append("/");
+        }
+
+        destination.append(source_filename);
+
+        json create_dest_path_res = request({{"call", "my_create"}, {"path", destination}});
+        destination_inode_number = create_dest_path_res["inodeNumber"];
+    }
+
+    // Tests if destinations parent has permissions (if not even its parents exists, throw error)
+    testPermissions(get_parent_path(destination), false, true, false);
+
+    json copy_res_json = request({{"call", "copy_data"},
+                                  {"source", source_inode_number},
+                                  {"destination", destination_inode_number}});
+
+    if (copy_res_json["status"] == nullptr || !copy_res_json["status"])
+    {
+        throw ERROR_generic;
+    }
 }
 
 //******************************************************************************

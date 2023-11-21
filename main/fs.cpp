@@ -185,6 +185,11 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
                 response["status"] = FS.my_rmdir(request["path"]);
                 //******************************************************************************
             }
+            else if (request["call"] == "copy_data")
+            {
+                response["status"] = FS.copy_data(request["source"],request["destination"]);
+                //******************************************************************************
+            }
             else
             {
                 string data = "";

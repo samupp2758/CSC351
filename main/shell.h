@@ -83,6 +83,7 @@ using namespace std;
             //Repetitive request helpers
             void handleSeekHelp(string help); //-h --help
             int testPath(string path,bool noThrow = false); //my_readpath (and throws if notfound)
+            bool testDirectory(string path,bool noThrow = false); //my_readpath (and throws if notfound)
             void testPermissions(string path,bool read,bool write,bool execute);
             void build_ls(int dirInode);
 
