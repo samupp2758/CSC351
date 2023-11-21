@@ -37,13 +37,21 @@ using namespace std;
         public:
             Shell(string serverIp, int port,int buffer);
             ~Shell();
-            int std_buffer;
+
+            //MAX SHELL BUFFER SIZE
+            int STD_buffer;
+
+            //TCP INFO
             char *serverIp;
             int port;
             int clientSd;
-            json user;
-            string curDir;
-            string *history; //Todo
+
+            json user; //UID AND GID
+            string curDir; //current working directory
+            string *history; //TODO
+
+            //CURRENT COMMAND SPLITTED BY " "
+            char **currentCommand;
 
             //TCP REQUEST-RESPONSE FUNCTIONS
             json request(json req_json);
@@ -54,20 +62,42 @@ using namespace std;
             void execute(string data);
             
             //COMMAND CONTROLLERS
-            void my_ls(char**input);
-            void my_cd(char**input);
-            void my_mkdir(char**input);
-            void my_Lcp(char**input);
-            void my_Icp(char**input);
-            void my_cat(char **input);
-            void my_rmdir(char **input);
+            void my_ls();
+            void my_cd();
+            void my_mkdir();
+            void my_rmdir();
+            void my_Lcp();
+            void my_Icp();
+            void my_cat();
+            void my_cp();
+            void my_mv();
+            void my_ln();
+            void my_rm();
 
-            //HELPER FUNCTIONS
+            //HELPER FUNCTIONS (standalone functions)
             char **line_splitter(char *line, string splitter);
             string format_mode(string mode);
             string get_parent_path(string path);
-            void build_ls(json callResponses, char* r);
             string to_abspath(string curDir, string raw);
+
+            //Repetitive request helpers
+            void handleSeekHelp(string help); //-h --help
+            int testPath(string path,bool noThrow = false); //my_readpath (and throws if notfound)
+            void testPermissions(string path,bool read,bool write,bool execute);
+            void build_ls(int dirInode);
+
+
+            //ERROR Messages
+            string ERROR_generic = "Failed";
+            string ERROR_args_missing = "Not enough arguments! run -h or --help to see the usage";
+            string ERROR_args_overflow = "Too many arguments! run -h or --help to see the usage";
+            string ERROR_dir_not_empty = "Directory not empty!";
+            string ERROR_perm_denied = "Permission Denied";
+            string ERROR_file_exists = "File exists";
+            string ERROR_notfound = "No such file or directory";
+            string ERROR_file_not_imported = "Error while trying to import the file";
+            string ERROR_file_not_created = "File NOT created :(";
+            string ERROR_not_a_dir = "Not a directory";
 
     };
 
