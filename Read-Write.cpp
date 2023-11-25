@@ -1707,7 +1707,11 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 
 //******************************************************************************
 
+//Returns T/F based on if the write was successful.
 bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffer) {
+    //If the write was unsuccessful, it does add the data to the file. The file will
+    // still have the blocks that were allocated to it in the unsuccessful write.
+    //If you write off the end of the FS it will just say that the write failed.
 	bool success = true;
     bool extendedSuccess = true;
 	int numberOfBlocks = 0;

@@ -22,7 +22,6 @@ class FileSystem {
 
     public:
         fstream disk;
-        string FileName;
 
         FileSystem(string name);
         ~FileSystem();
