@@ -602,7 +602,7 @@ int FileSystem::allocate() {
     bool* currentBits;
     bool exit = false;
     //cout << "allocate 1" << endl;
-    while (!blockNumber && bitmap <= 17) {
+    while (!blockNumber && bitmap <= 16) {
         //cerr << "allocate bitmap" << bitmap << endl;
         delete buffer;
         buffer = readBlock(bitmap);
@@ -829,9 +829,9 @@ bool FileSystem::my_extend(int inodeNumber) {
     startingBlock = allocate();
     //cout << "extend 3" << endl;
     //cerr << endl;
-    //for (int i= 0; i < 8; i++) {
-    //    cerr << startingBlock + i << " ";
-    //}
+    for (int i= 0; i < 8; i++) {
+        cerr << startingBlock + i << " ";
+    }
     //cout << "extend 4" << endl;
 
 
@@ -1709,6 +1709,7 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 
 bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffer) {
 	bool success = true;
+    bool extendedSuccess = true;
 	int numberOfBlocks = 0;
 	int currentByte = 0;
 	int start = 0;
@@ -1799,13 +1800,16 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
         }
         int k = 0;
         if (currentBlock < 12) {
-            cerr << "first indirect block testing" << endl;
             addresses = get_addresses(inodeNumber, 0);
             for (int i = currentBlock; i < 12; i++) {
                 if (addresses[i] == 0) {
-                    my_extend(inodeNumber);
+                    extendedSuccess = my_extend(inodeNumber);
                     delete addresses;
                     addresses = get_addresses(inodeNumber, 0);
+
+                    if (!extendedSuccess) {
+                        break;
+                    }
                     //cout << " extended ";
                 }
                 buffer2 = readBlock(addresses[i]);
@@ -1831,18 +1835,18 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
         }
         //cerr << "ran 1" << endl;
         //cout << "current id " << currentID << endl;
-        while (!done) {
-            cerr << "why" << endl;
+        while (!done && extendedSuccess) {
+            cout << bytesWritten << endl;
             addresses = get_addresses(inodeNumber, currentID);
-            for (int i = 0; i < 1024; i++) {
-                //cout << addresses[i] << " ";
-            }
             for (int i = (currentBlock - 12) % 1024; i < 1024; i++) {
-                
                 if (addresses[i] == 0) {
-                    my_extend(inodeNumber);
+                    extendedSuccess = my_extend(inodeNumber);
                     delete addresses;
                     addresses = get_addresses(inodeNumber, currentID);
+
+                    if (!extendedSuccess) {
+                        break;
+                    }
                 }
                 buffer2 = readBlock(addresses[i]);
                 //cerr << "ran 3" << endl;
@@ -1850,7 +1854,6 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                 for (int j = start; j < 4096; j++) {
                     if (bytesWritten >= nBytes) {
                         done = true;
-                        cerr << "done!!!!!!!!!!" << endl;
                         break;
                     }
                     buffer2[j] = buffer[k];
@@ -1870,6 +1873,9 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
             }
             currentID++;
             delete addresses;
+            if (!extendedSuccess) {
+                break;
+            }
         }
 
         /*
@@ -1919,15 +1925,18 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
 			writeBlock(fileBlocks[i], newBuffer);	
 		}
         */
-        int currentSize = my_Read_Size(inodeNumber);
-		my_Set_Size(inodeNumber, (currentSize >= position + nBytes ? currentSize : position + nBytes));
+        if (extendedSuccess) {
+            int currentSize = my_Read_Size(inodeNumber);
+		    my_Set_Size(inodeNumber, (currentSize >= position + nBytes ? currentSize : position + nBytes));
+        }
 		my_Set_MTime(inodeNumber);
 		cout << "last 7" << endl;
-	} else {
+	}
+    if (!(success && extendedSuccess)) {
 		cerr << "Write has failed" << endl;
 	}
 	delete newBuffer, fileBlocks;
-	return success;
+	return (success && extendedSuccess);
 }
 
 //******************************************************************************
@@ -1965,8 +1974,8 @@ int FileSystem::my_create(string path, int user, int group) {
 //******************************************************************************
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
-    //createDataFile(pow(2, 31), name);
-    createDataFile(1024 * 1024 * 8, name);
+    createDataFile(pow(2, 31), name);
+    //createDataFile(1024 * 1024 * 8, name);
     //FileName = name;
     char* buffer;
 
@@ -1986,6 +1995,20 @@ void FileSystem::Create_New_FS(string name) {
     bool mode2[] = {true, true, true, false, false, false, false, false};
     char mode[] = {binary_To_Character(mode1), binary_To_Character(mode2)};
     create_inode(mode, 0, 0);
+}
+
+//******************************************************************************
+
+//Creates a file with the given name and size filled with random characters.
+void FileSystem::make_Test_File(string name, int size) {
+    fstream file;
+    char* c = new char[1];
+    file.open(name, ios::out | ios::trunc);
+    for (int i = 0; i < size; i++) {
+        c[0] = (char)(rand() % 255);
+        file.write(c, 1);
+    }
+    file.close();
 }
 
 //******************************************************************************

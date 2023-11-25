@@ -22,6 +22,7 @@ class FileSystem {
 
     public:
         fstream disk;
+        string FileName;
 
         FileSystem(string name);
         ~FileSystem();
@@ -89,6 +90,7 @@ class FileSystem {
         char* integer_To_Characters(int num);
         int characters_To_Integer(char* chars);
         int decimal_To_Binary(int num);
+        void make_Test_File(string name, int size);
 
         //Debugging
         void print_inode_bitmap();
