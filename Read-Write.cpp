@@ -829,9 +829,9 @@ bool FileSystem::my_extend(int inodeNumber) {
     startingBlock = allocate();
     //cout << "extend 3" << endl;
     //cerr << endl;
-    for (int i= 0; i < 8; i++) {
-        cerr << startingBlock + i << " ";
-    }
+    //for (int i= 0; i < 8; i++) {
+    //    cerr << startingBlock + i << " ";
+    //}
     //cout << "extend 4" << endl;
 
 
