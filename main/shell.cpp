@@ -1083,7 +1083,63 @@ string source;
 void Shell::my_mv()
 {
     string help = "usage: mv source destination";
+    string source_path;
+    string destination_path;
+    int source_inode;
+    int destination_inode;
+
     handleSeekHelp(help);
+
+    //see if command was called correctly
+    if (!currentCommand[2])
+    {
+        throw ERROR_args_missing;
+    } else if (currentCommand[3])
+    {
+        throw ERROR_args_overflow;
+    }
+
+    //see if paths exist
+    source_path = to_abspath(curDir, currentCommand[1]);
+    destination_path = to_abspath(curDir, currentCommand[2]);
+
+    source_inode = testPath(source_path);
+    destination_inode = testPath(destination_path, true);
+
+    // Tests if destinations parent exists (if not even its parents exists, throw error)
+    testPath(get_parent_path(destination_path));
+
+    // See if we can copy from source
+    testPermissions(source_path, true, true, false);
+
+    // If the destination didn't exist before, creates it
+    if (destination_inode == -1 && !testDirectory(source_path, true))
+    {
+        json create_dest_path_res = request({{"call", "my_create"}, {"path", destination_path}});
+        destination_inode = create_dest_path_res["inodeNumber"];
+
+        if (destination_inode == -1)
+        {
+            throw ERROR_file_not_created;
+        }
+    }
+
+    // Tests if destinations parent has permissions (if not even its parents exists, throw error)
+    testPermissions(get_parent_path(destination_path), false, true, false);
+
+    //copy the data over
+    json copy_res_json = request({{"call", "copy_data"},
+                                  {"source", source_inode},
+                                  {"destination", destination_inode}});
+
+    if (copy_res_json["status"] == nullptr || !copy_res_json["status"])
+    {
+        throw ERROR_generic;
+    }
+
+    //remove the old source
+    remove_file(source_path);
+
 }
 
 //******************************************************************************
@@ -1092,7 +1148,40 @@ void Shell::my_mv()
 void Shell::my_ln()
 {
     string help = "usage: ln source destination";
+    string source_path;
+    string destination_path;
+    int source_inode;
+    int destination_inode;
+    int dest_parent_inode;
+
     handleSeekHelp(help);
+
+    //see if command was called correctly
+    if (!currentCommand[2])
+    {
+        throw ERROR_args_missing;
+    } else if (currentCommand[3])
+    {
+        throw ERROR_args_overflow;
+    }
+
+    //see if paths exist
+    source_path = to_abspath(curDir, currentCommand[1]);
+    destination_path = to_abspath(curDir, currentCommand[2]);
+
+    source_inode = testPath(source_path);
+    dest_parent_inode = testPath(get_parent_path(destination_path));
+    destination_inode = testPath(destination_path, true);
+
+    // Tests if destinations parent exists (if not even its parents exists, throw error)
+    testPath(get_parent_path(destination_path));
+
+    //test permissions
+    testPermissions(source_path, false, false, true);
+
+    //create new entry using create_newentry with the source inode and destination path
+    //json new_link = request({"call", my_write_dir(dest_parent_inode, source_inode, destination_path)});
+
 }
 
 //******************************************************************************
