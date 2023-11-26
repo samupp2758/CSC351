@@ -177,12 +177,17 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
             }
             else if (request["call"] == "my_remove_entry")
             {
-                response["status"] = FS.my_remove_entry(request["inodeNumber"], 0);
+                response["status"] = FS.my_remove_entry(request["inodeNumber"], request["position"]);
                 //******************************************************************************
             }
             else if (request["call"] == "my_rmdir")
             {
                 response["status"] = FS.my_rmdir(request["path"]);
+                //******************************************************************************
+            }
+            else if (request["call"] == "my_search_dir")
+            {
+                response["res"] = FS.my_search_dir(request["dirinodeNumber"],request["filename"]);
                 //******************************************************************************
             }
             else if (request["call"] == "copy_data")

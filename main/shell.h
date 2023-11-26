@@ -79,6 +79,7 @@ using namespace std;
             string format_mode(string mode);
             string get_parent_path(string path);
             string to_abspath(string curDir, string raw);
+            string get_filename(string filepath);
 
             //Repetitive request helpers
             void handleSeekHelp(string help); //-h --help
@@ -95,7 +96,7 @@ using namespace std;
             string ERROR_dir_not_empty = "Directory not empty!";
             string ERROR_perm_denied = "Permission Denied";
             string ERROR_file_exists = "File exists";
-            string ERROR_notfound = "No such file or directory";
+            string ERROR_notfound = ": No such file or directory";
             string ERROR_file_not_imported = "Error while trying to import the file";
             string ERROR_file_not_created = "File NOT created :(";
             string ERROR_not_a_dir = "Not a directory";

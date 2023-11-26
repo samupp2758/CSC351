@@ -140,11 +140,31 @@ string Shell::get_parent_path(string path)
             }
         }
     }
-
+    if (ans == "")
+    {
+        ans = "/";
+    }
     return ans;
 }
 
 //******************************************************************************
+
+string Shell::get_filename(string filepath){
+    // Gets the name of the file by creating the absolute path to it
+    // Then getting the very last position of the line_splitter "/"
+    char **source_path_splitted = Shell::line_splitter((char *)filepath.data(), "/");
+
+    // Gets the file name from the source path
+    string source_filename;
+    int j = 0;
+    while (source_path_splitted[j])
+    {
+        source_filename = source_path_splitted[j];
+        j++;
+    }
+    return source_filename;
+
+}
 
 /*Johnny
  Gets the raw path passed by the user and return its absolute path*/
@@ -237,7 +257,7 @@ int Shell::testPath(string path, bool noThrow)
     if (response["inodeNumber"] == -1 && !noThrow)
     {
         string g = path;
-        g.append(": No such file or directory");
+        g.append(ERROR_notfound);
         throw g;
     }
     return int(response["inodeNumber"]);
@@ -607,7 +627,7 @@ void Shell::my_Lcp()
     int inode_num;
 
     handleSeekHelp(help);
-
+/*
     //set absolute path of file on host machine
     getcwd(curDir_machine, 3000);
 
@@ -716,7 +736,7 @@ void Shell::my_Lcp()
         throw ERROR_notfound;
     }
 
-
+*/
 }
 
 //******************************************************************************
@@ -771,19 +791,9 @@ void Shell::my_Icp()
         buffer = new char[file_size];
         file.read(buffer, file_size);
 
-        // Gets the name of the file by creating the absolute path to it
-        // Then getting the very last position of the line_splitter "/"
-        char **source_path_splitted = line_splitter((char *)source_path.data(), "/");
+        string source_filename = get_filename(source_path);
 
-        // Gets the file name from the source path
-        string source_filename;
-        int j = 0;
-        while (source_path_splitted[j])
-        {
-            source_filename = source_path_splitted[j];
-            j++;
-        }
-
+        
         // Inserts in to the destination path
 if (destination_path != "/")
         {
@@ -919,7 +929,6 @@ void Shell::my_cat()
 
 //******************************************************************************
 
-// TODO
 void Shell::my_cp()
 {
     string help = "usage: cp source destination";
@@ -975,14 +984,7 @@ string source;
     }
     else if (testDirectory(destination, true))
     {
-        char **source_path_splitted = line_splitter((char *)source.data(), "/");
-        string source_filename;
-        int j = 0;
-        while (source_path_splitted[j])
-        {
-            source_filename = source_path_splitted[j];
-            j++;
-        }
+        string source_filename = get_filename(source);
 
         // Inserts in to the destination path
         if (destination != "/")
@@ -1032,9 +1034,11 @@ void Shell::my_ln()
 // TODO
 void Shell::my_rm()
 {
-    string source;
-    string help = "usage: rm path/to/directory";
-    int iNodeNum;
+    string sourceDIR;
+    string sourcePath;
+    string help = "usage: rm path/to/file";
+    int diriNodeNum;
+    int filePOS;
 
     handleSeekHelp(help);
 
@@ -1045,24 +1049,37 @@ void Shell::my_rm()
     else if(currentCommand[2]) {
         throw ERROR_args_overflow;
     }
-    source = to_abspath(curDir, currentCommand[1]);
 
-    //CPP
-    iNodeNum = testPath(source);
+    sourcePath = to_abspath(curDir, currentCommand[1]);
+    sourceDIR = get_parent_path(sourcePath);
+    
+    testPath(sourcePath);
 
     //If failure occurs in remove entry, display to user via shell that a failure occurred, else do nothing.
-    if(iNodeNum != -1){
-        //Confirm that the user has write permissions and that the path exists. If either of them do not, return failure to the user via shell and reason for failure.
-        testPermissions(source, false, true, false);
+    diriNodeNum = testPath(sourceDIR);
+    
+    string source_filename = get_filename(sourcePath);
 
-        //Remove entry by sending call to FS via TCP to remove_entry(Path)
-        json requestForm = {{"call", "remove_entry"},
-                            {"path", iNodeNum}};
+    //Confirm that the user has write permissions and that the path exists. If either of them do not, return failure to the user via shell and reason for failure.
+    testPermissions(sourceDIR, false, true, false);
 
-        json response = request(requestForm);
-    } else {
-        throw ERROR_notfound;
+    json response_search_dir = request({{"call", "my_search_dir"},
+                        {"dirinodeNumber", diriNodeNum},
+                        {"filename", source_filename}});
+
+    filePOS = (int)response_search_dir["res"];
+    
+    if(filePOS == -1){
+        throw ERROR_generic;
     }
+
+
+    //Remove entry by sending call to FS via TCP to remove_entry(Path)
+    json requestForm = {{"call", "my_remove_entry"},
+                        {"inodeNumber", diriNodeNum},
+                        {"position", filePOS}};
+
+    json response = request(requestForm);
 
 
 }
