@@ -647,7 +647,6 @@ void Shell::my_mkdir()
 
 //******************************************************************************
 
-// TODO
 void Shell::my_Lcp()
 {
     string help = "usage: Lcp filesystem/source machine/destination_folder";
@@ -897,7 +896,7 @@ void Shell::my_Icp()
             if (position >= file_size)
             {
                 successful = true;
-            } // TODO IMPLEMENT AN ERROR HANDLER
+            }
         }
         cout << endl;
 
@@ -1098,7 +1097,6 @@ void Shell::my_ln()
 
 //******************************************************************************
 
-// TODO
 void Shell::my_chown()
 {
     string help = "usage: chown [UID:GID or UID] path/to/fileORdirectory";
