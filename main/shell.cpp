@@ -268,7 +268,7 @@ int Shell::testPath(string path, bool noThrow)
 /*Tests to see if the path points to a directory or not*/
 bool Shell::testDirectory(string path, bool noThrow)
 {
-    int inodeNumber = testPath(path);
+    int inodeNumber = testPath(path,noThrow);
     bool rc = false;
 
     json mode_res = request({{"call", "my_Read_Mode"}, {"inodeNumber", inodeNumber}});
@@ -689,14 +689,26 @@ void Shell::my_Lcp()
     //check permissions to read file
     testPermissions(source, true, false, false);
 
-    // Gets the file name from the source path
-    string destination_filename = get_filename(source);
 
-    // Inserts in to the destination path
-    destination.append("/");
-    destination.append(destination_filename);
 
-    remove(destination.c_str());
+
+    struct stat s;
+    if( stat(destination.c_str(),&s) == 0 )
+    {
+        if( s.st_mode & S_IFDIR )
+        {
+            
+            // Gets the file name from the source path
+            string destination_filename = get_filename(source);
+
+            // Inserts in to the destination path
+            destination.append("/");
+            destination.append(destination_filename);
+        }
+        remove(destination.c_str());
+    }
+
+
     //create the file on the underlying system
     file.open(destination, ios::out | ios::app | ios::binary);
 
@@ -767,6 +779,7 @@ void Shell::my_Icp()
     string help = "usage: Icp machine/source filesystem/destination";
     string source_path;
     string destination_path;
+    string filename;
     int destination_inode_number;
     char curDir_machine[3000];
     fstream file;
@@ -794,8 +807,14 @@ void Shell::my_Icp()
     source_path = to_abspath(curDir_machine, currentCommand[1]);
     destination_path = to_abspath(curDir, currentCommand[2]);
 
-    // Verifies if the user has permission to Icp (just write)
-    testPermissions(get_parent_path(destination_path), false, false, true);
+    if(testDirectory(destination_path,true)){
+        // Verifies if the user has permission to Icp (just write)
+        testPermissions(destination_path, false, false, true);
+    }else{
+        testPath(get_parent_path(destination_path));
+        testPermissions(get_parent_path(destination_path), false, false, true);
+
+    }
 
     file.open(source_path, ios::in | ios::binary);
 
@@ -812,16 +831,23 @@ void Shell::my_Icp()
         buffer = new char[file_size];
         file.read(buffer, file_size);
 
-        string source_filename = get_filename(source_path);
 
-        
-        // Inserts in to the destination path
-        if (destination_path != "/")
-        {
-            destination_path.append("/");
+        if(testDirectory(destination_path,true)){   
+            filename = get_filename(source_path);
+            // Inserts in to the destination path
+            if (destination_path != "/")
+            {
+                destination_path.append("/");
+            }
+
+            destination_path.append(filename);
+        }else{
+            filename = get_filename(destination_path);
         }
 
-        destination_path.append(source_filename);
+        if(testDirectory(destination_path,true)){
+            throw ERROR_file_exists;
+        }
 
         // Creates the destination path (file)
         json create_dest_path_res = request({{"call", "my_create"}, {"path", destination_path}});
@@ -885,7 +911,7 @@ void Shell::my_Icp()
 
         if (successful)
         {
-            cout << "Success! File " << source_filename << " created" << endl;
+            cout << "Success! File " << filename << " created" << endl;
         }
         else
         {
