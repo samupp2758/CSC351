@@ -338,6 +338,37 @@ void Shell::testPermissions(string path, bool read, bool write, bool execute)
 
 //******************************************************************************
 
+bool Shell::remove_file(string sourcePath){
+    int filePOS;
+    string sourceDIR = get_parent_path(sourcePath);
+    //If failure occurs in remove entry, display to user via shell that a failure occurred, else do nothing.
+    int diriNodeNum = testPath(sourceDIR);
+    
+    string source_filename = get_filename(sourcePath);
+
+    json response_search_dir = request({{"call", "my_search_dir"},
+                        {"dirinodeNumber", diriNodeNum},
+                        {"filename", source_filename}});
+
+    filePOS = (int)response_search_dir["res"];
+    
+    if(filePOS == -1){
+        throw ERROR_generic;
+    }
+
+
+    //Remove entry by sending call to FS via TCP to remove_entry(Path)
+    json requestForm = {{"call", "my_remove_entry"},
+                        {"inodeNumber", diriNodeNum},
+                        {"position", filePOS}};
+
+    json response = request(requestForm);
+
+    return response["status"] >= 0;
+}
+
+//******************************************************************************
+
 // Request for normal json
 json Shell::request(json req_json)
 {
@@ -364,13 +395,13 @@ json Shell::request(json req_json)
 //******************************************************************************
 
 // Request for writing data to the FS, it returns the number of bytes sent
-int Shell::request_write(json req_json, char *buffer)
+json Shell::request_write(json req_json, char *buffer)
 {
     int size = int(req_json["nBytes"]);
     char req[size];
     memset(&req, 0, size); // clear the buffer
 
-    request(req_json);
+    json res = request(req_json);
 
     int i = 0;
     while (size >= i)
@@ -382,7 +413,10 @@ int Shell::request_write(json req_json, char *buffer)
     int sent = send(clientSd, (char *)&req, size, 0);
     memset(&req, 0, size); // clear the buffer
     int received = recv(clientSd, (char *)&req, STD_buffer, 0);
-    return sent;
+
+    json res_write = json::parse((string)req);
+
+    return res_write;
 }
 
 //******************************************************************************
@@ -616,18 +650,18 @@ void Shell::my_mkdir()
 // TODO
 void Shell::my_Lcp()
 {
-    string help = "usage: Lcp filesystem/source machine/destination";
+    string help = "usage: Lcp filesystem/source machine/destination_folder";
     string source;
     string destination;
     int source_inode;
     char curDir_machine[3000];      //directory on underlying machine
-    fstream file;
+    ofstream file;
     int file_size;
     char *buffer;
     int inode_num;
 
     handleSeekHelp(help);
-/*
+
     //set absolute path of file on host machine
     getcwd(curDir_machine, 3000);
 
@@ -647,47 +681,34 @@ void Shell::my_Lcp()
     destination = to_abspath(curDir_machine, currentCommand[2]);
 
     //check the path and get the size of file to transfer
-    int inode_num = testPath(source);
+    inode_num = testPath(source);
+    
     json size_res_json = request({{"call", "my_Read_Size"}, {"inodeNumber", inode_num}});
     file_size = size_res_json["size"];
 
     //check permissions to read file
-    testPermissions(get_parent_path(source), true, false, false);
-
-    // Gets the name of the file by creating the absolute path to it
-    // Then getting the very last position of the line_splitter "/"
-    char **destination_path_splitted = line_splitter((char *)destination.data(), "/");
+    testPermissions(source, true, false, false);
 
     // Gets the file name from the source path
-    string destination_filename;
-    int j = 0;
-    while (destination_path_splitted[j])
-    {
-        destination = destination_path_splitted[j];
-        j++;
-    }
+    string destination_filename = get_filename(source);
 
     // Inserts in to the destination path
+    destination.append("/");
     destination.append(destination_filename);
 
-
+    remove(destination.c_str());
     //create the file on the underlying system
-    file.open(destination, ios::in | ios::binary);
+    file.open(destination, ios::out | ios::app | ios::binary);
 
     if (file.is_open())
     {
-
-        if (inode_num == -1)
-        {
-            throw ERROR_notfound;
-        }
 
         cout << "Transfering file to underlying system...." << endl;
 
         int buf_size = STD_buffer;
         int position = 0;
         bool successful = false;
-        while (position < file_size)
+        while (1)
         {
             // If the buffer size is too big to send the chunk, it sets the buffer size to the remaining chunk size
             if ((position + buf_size) >= file_size)
@@ -707,7 +728,7 @@ void Shell::my_Lcp()
             request_read(chunkForm, buffer_piece);  //gives you the number of bytes read
 
             //put buffer_piece into destination file
-            file << buffer_piece;
+            file.write(buffer_piece, buf_size);
 
             //move position so you write to the next part
             position += buf_size;
@@ -718,6 +739,7 @@ void Shell::my_Lcp()
             if (position >= file_size)
             {
                 successful = true;
+                break;
             } // TODO IMPLEMENT AN ERROR HANDLER
         }
         cout << endl;
@@ -725,6 +747,7 @@ void Shell::my_Lcp()
         if (successful)
         {
             cout << "Success! File " << source << " was copied!" << endl;
+            file.close();
         }
         else
         {
@@ -735,8 +758,6 @@ void Shell::my_Lcp()
     {
         throw ERROR_notfound;
     }
-
-*/
 }
 
 //******************************************************************************
@@ -836,7 +857,11 @@ void Shell::my_Icp()
                               {"nBytes", buf_size},
                               {"size", file_size},
                               {"inodeNumber", destination_inode_number}};
-            request_write(chunkForm, buffer_piece);
+            json res = request_write(chunkForm, buffer_piece);
+
+            if(res["status"] == 0){
+                break;
+            }
 
             position += buf_size;
 
@@ -849,6 +874,14 @@ void Shell::my_Icp()
             } // TODO IMPLEMENT AN ERROR HANDLER
         }
         cout << endl;
+
+        json size_res_json = request({{"call", "my_Read_Size"}, {"inodeNumber", destination_inode_number}});
+        int remote_file_size = size_res_json["size"];
+
+        if(remote_file_size != file_size){
+            remove_file(destination_path);
+            throw ERROR_notenough_space;
+        }
 
         if (successful)
         {
@@ -1127,31 +1160,10 @@ void Shell::my_rm()
     
     testPath(sourcePath);
 
-    //If failure occurs in remove entry, display to user via shell that a failure occurred, else do nothing.
-    diriNodeNum = testPath(sourceDIR);
-    
-    string source_filename = get_filename(sourcePath);
-
     //Confirm that the user has write permissions and that the path exists. If either of them do not, return failure to the user via shell and reason for failure.
     testPermissions(sourceDIR, false, true, false);
 
-    json response_search_dir = request({{"call", "my_search_dir"},
-                        {"dirinodeNumber", diriNodeNum},
-                        {"filename", source_filename}});
-
-    filePOS = (int)response_search_dir["res"];
-    
-    if(filePOS == -1){
-        throw ERROR_generic;
-    }
-
-
-    //Remove entry by sending call to FS via TCP to remove_entry(Path)
-    json requestForm = {{"call", "my_remove_entry"},
-                        {"inodeNumber", diriNodeNum},
-                        {"position", filePOS}};
-
-    json response = request(requestForm);
+    remove_file(sourcePath);
 
 
 }

@@ -58,7 +58,7 @@ using namespace std;
 
             //TCP REQUEST-RESPONSE FUNCTIONS
             json request(json req_json);
-            int request_write(json req_json,char* buffer); //
+            json request_write(json req_json,char* buffer); //
             int request_read(json req_json,char* &res);
             
             //COMMAND MAIN CONTROLLER
@@ -90,6 +90,7 @@ using namespace std;
             int testPath(string path,bool noThrow = false); //my_readpath (and throws if notfound)
             bool testDirectory(string path,bool noThrow = false); //my_readpath (and throws if notfound)
             void testPermissions(string path,bool read,bool write,bool execute);
+            bool remove_file(string sourcePath);
             void build_ls(int dirInode);
 
 
@@ -106,6 +107,7 @@ using namespace std;
             string ERROR_not_a_dir = "Not a directory";
             string ERROR_user_notfound = "ilegal user";
             string ERROR_group_notfound = "ilegal group";
+            string ERROR_notenough_space = ": Not enough space!!";
 
     };
 
