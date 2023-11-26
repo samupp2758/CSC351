@@ -367,7 +367,7 @@ int Shell::request_write(json req_json, char *buffer)
 
 //******************************************************************************
 
-// Request for reading data to the FS (returns the number of bytes received)
+// Request for reading data from the FS (returns the number of bytes received)
 int Shell::request_read(json req_json, char *&res)
 {
     int size = (int)req_json["nBytes"];
@@ -496,7 +496,15 @@ void Shell::my_cd()
     // Gets the directory passed by the client or sends the client to root
     dir = (currentCommand[1] ? to_abspath(curDir, currentCommand[1]) : root);
 
-    testDirectory(dir);
+    int inodeNumber = testPath(dir);
+
+    // Verifying if the path is to a directory
+    json mode_res = request({{"call", "my_Read_Mode"}, {"inodeNumber", inodeNumber}});
+    string mode_pretty = format_mode(mode_res["mode"]);
+    if (mode_pretty[0] != 'd')
+    {
+        throw ERROR_not_a_dir;
+    }
 
     testPermissions(dir, false, false, true);
 
@@ -589,14 +597,133 @@ void Shell::my_mkdir()
 void Shell::my_Lcp()
 {
     string help = "usage: Lcp filesystem/source machine/destination";
+    string source;
+    string destination;
+    int source_inode;
+    char curDir_machine[3000];      //directory on underlying machine
+    fstream file;
+    int file_size;
+    char *buffer;
+    int inode_num;
+
     handleSeekHelp(help);
+
+    //set absolute path of file on host machine
+    getcwd(curDir_machine, 3000);
+
+    //sees if the function was called incorrectly
+    if (!currentCommand[2])
+    {
+        throw ERROR_args_missing;
+    }
+
+    if (currentCommand[3])
+    {
+        throw ERROR_args_overflow;
+    }
+
+    //set the paths needed
+    source = to_abspath(curDir, currentCommand[1]);
+    destination = to_abspath(curDir_machine, currentCommand[2]);
+
+    //check the path and get the size of file to transfer
+    int inode_num = testPath(source);
+    json size_res_json = request({{"call", "my_Read_Size"}, {"inodeNumber", inode_num}});
+    file_size = size_res_json["size"];
+
+    //check permissions to read file
+    testPermissions(get_parent_path(source), true, false, false);
+
+    // Gets the name of the file by creating the absolute path to it
+    // Then getting the very last position of the line_splitter "/"
+    char **destination_path_splitted = line_splitter((char *)destination.data(), "/");
+
+    // Gets the file name from the source path
+    string destination_filename;
+    int j = 0;
+    while (destination_path_splitted[j])
+    {
+        destination = destination_path_splitted[j];
+        j++;
+    }
+
+    // Inserts in to the destination path
+    destination.append(destination_filename);
+
+
+    //create the file on the underlying system
+    file.open(destination, ios::in | ios::binary);
+
+    if (file.is_open())
+    {
+
+        if (inode_num == -1)
+        {
+            throw ERROR_notfound;
+        }
+
+        cout << "Transfering file to underlying system...." << endl;
+
+        int buf_size = STD_buffer;
+        int position = 0;
+        bool successful = false;
+        while (position < file_size)
+        {
+            // If the buffer size is too big to send the chunk, it sets the buffer size to the remaining chunk size
+            if ((position + buf_size) >= file_size)
+            {
+                buf_size = (file_size - position);
+            }
+
+            // Reads the buffer piece to underlying file <-- needs to change to reading from fs TO underlying file
+            char *buffer_piece = new char[buf_size];
+
+            //json for reading from the file
+            json chunkForm = {{"call", "my_read"},
+                              {"position", position},
+                              {"nBytes", buf_size},
+                              {"size", file_size},
+                              {"inodeNumber", inode_num}};
+            request_read(chunkForm, buffer_piece);  //gives you the number of bytes read
+
+            //put buffer_piece into destination file
+            file << buffer_piece;
+
+            //move position so you write to the next part
+            position += buf_size;
+
+            // Print the percentage
+            cout << "\r" << (int)(((float)position / (float)file_size) * 100) << "%                   ";
+
+            if (position >= file_size)
+            {
+                successful = true;
+            } // TODO IMPLEMENT AN ERROR HANDLER
+        }
+        cout << endl;
+
+        if (successful)
+        {
+            cout << "Success! File " << source << " was copied!" << endl;
+        }
+        else
+        {
+            throw ERROR_file_not_created;
+        }
+    }
+    else
+    {
+        throw ERROR_notfound;
+    }
+
+
 }
 
 //******************************************************************************
 
 void Shell::my_Icp()
 {
-    string help = "usage: Icp machine/source filesystem/destination, [currently, the file on the destination has the same name as the machine]";
+    string help = "usage: Icp machine/source filesystem/destination";
     string source_path;
     string destination_path;
     int destination_inode_number;
@@ -612,7 +739,7 @@ void Shell::my_Icp()
     getcwd(curDir_machine, 3000);
 
     // Sees if there is any missing or overflowing args
-    if (!currentCommand[2])
+    if (!currentCommand[2] || !currentCommand[1])
     {
         throw ERROR_args_missing;
     }
@@ -626,8 +753,8 @@ void Shell::my_Icp()
     source_path = to_abspath(curDir_machine, currentCommand[1]);
     destination_path = to_abspath(curDir, currentCommand[2]);
 
-    // Verifies if the user has permission to Icp (just execute)
-    testPermissions(destination_path, false, false, true);
+    // Verifies if the user has permission to Icp (just write)
+    testPermissions(get_parent_path(destination_path), false, false, true);
 
     file.open(source_path, ios::in | ios::binary);
 
@@ -658,7 +785,7 @@ void Shell::my_Icp()
         }
 
         // Inserts in to the destination path
-        if (destination_path != "/")
+if (destination_path != "/")
         {
             destination_path.append("/");
         }
@@ -796,7 +923,7 @@ void Shell::my_cat()
 void Shell::my_cp()
 {
     string help = "usage: cp source destination";
-    string source;
+string source;
     string destination;
     int destination_inode_number;
     int source_inode_number;
@@ -905,8 +1032,39 @@ void Shell::my_ln()
 // TODO
 void Shell::my_rm()
 {
+    string source;
     string help = "usage: rm path/to/directory";
+    int iNodeNum;
+
     handleSeekHelp(help);
+
+    //Check that input contains path, and new user of file.
+    if(!currentCommand[1]){
+        throw ERROR_args_missing;
+    }
+    else if(currentCommand[2]) {
+        throw ERROR_args_overflow;
+    }
+    source = to_abspath(curDir, currentCommand[1]);
+
+    //CPP
+    iNodeNum = testPath(source);
+
+    //If failure occurs in remove entry, display to user via shell that a failure occurred, else do nothing.
+    if(iNodeNum != -1){
+        //Confirm that the user has write permissions and that the path exists. If either of them do not, return failure to the user via shell and reason for failure.
+        testPermissions(source, false, true, false);
+
+        //Remove entry by sending call to FS via TCP to remove_entry(Path)
+        json requestForm = {{"call", "remove_entry"},
+                            {"path", iNodeNum}};
+
+        json response = request(requestForm);
+    } else {
+        throw ERROR_notfound;
+    }
+
+
 }
 
 //******************************************************************************
