@@ -190,6 +190,17 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
                 response["res"] = FS.my_search_dir(request["dirinodeNumber"],request["filename"]);
                 //******************************************************************************
             }
+            else if (request["call"] == "set_UID")
+            {
+                response["status"] = true;
+                FS.my_Set_UID(request["inodeNumber"],request["UID"]);
+                //******************************************************************************
+            }else if (request["call"] == "set_GID")
+            {
+                response["status"] = true;
+                FS.my_Set_GID(request["inodeNumber"],request["GID"]);
+                //******************************************************************************
+            }
             else if (request["call"] == "copy_data")
             {
                 response["status"] = FS.copy_data(request["source"],request["destination"]);

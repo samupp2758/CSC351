@@ -795,7 +795,7 @@ void Shell::my_Icp()
 
         
         // Inserts in to the destination path
-if (destination_path != "/")
+        if (destination_path != "/")
         {
             destination_path.append("/");
         }
@@ -1032,6 +1032,78 @@ void Shell::my_ln()
 //******************************************************************************
 
 // TODO
+void Shell::my_chown()
+{
+    string help = "usage: chown [UID:GID or UID] path/to/fileORdirectory";
+    long UID;
+    long GID;
+    bool mini_rc_for_GID = false;
+    string sourcePath;
+    int srciNodeNumber;
+
+    handleSeekHelp(help);
+    
+    //Check that input contains path, and new user of file.
+    if(!currentCommand[2]){
+        throw ERROR_args_missing;
+    }
+    else if(currentCommand[3]) {
+        throw ERROR_args_overflow;
+    }
+
+    //Gets the path of the directory and tests to see if it exists
+    sourcePath = to_abspath(curDir,currentCommand[2]);
+    srciNodeNumber = testPath(sourcePath);
+
+    //Split UID:GID into UID and GID
+    char** uid_gid = line_splitter(currentCommand[1],":");
+    
+    //Checks to see if the new user exists (currently the shell deals with the user list)
+    char *output;
+    UID = strtol(uid_gid[0], &output, 10);
+
+    if(users[UID] == nullptr || strcmp(uid_gid[0], to_string(UID).c_str())){
+        throw ERROR_user_notfound;
+    }
+
+    if(uid_gid[1] != nullptr){
+        GID = strtol(uid_gid[1], &output, 10);
+        for(int i = 0; i<groups.size();i++){
+            if(!strcmp(uid_gid[1], to_string(groups[i]).c_str())){
+                mini_rc_for_GID = true;
+                break;
+            }
+        }
+        if(!mini_rc_for_GID){
+            throw ERROR_group_notfound;
+        }
+    }
+
+    //Gets the UID of the file and checks to see if the current user can edit the ownership
+    json res_perms = request({{"call","my_Read_UID"},{"inodeNumber",srciNodeNumber}});    
+    if(user["UID"] != res_perms["UID"]){
+        throw ERROR_perm_denied;
+    }
+
+    //Changes the UID:
+    request({{"call","set_UID"},
+    {"inodeNumber",srciNodeNumber},
+    {"UID",UID}});    
+
+    //Changes the GID:
+    if(mini_rc_for_GID){
+        request({{"call","set_GID"},
+        {"inodeNumber",srciNodeNumber},
+        {"GID",GID}});   
+    }
+
+   //cout<<"Changing from "<<res_perms["UID"]<<endl;
+    //cout<<"to "<<UID<<endl;
+
+}
+
+//******************************************************************************
+
 void Shell::my_rm()
 {
     string sourceDIR;
@@ -1042,7 +1114,7 @@ void Shell::my_rm()
 
     handleSeekHelp(help);
 
-    //Check that input contains path, and new user of file.
+    //Check that input contains path
     if(!currentCommand[1]){
         throw ERROR_args_missing;
     }
@@ -1118,6 +1190,8 @@ void Shell::execute(string msg)
             my_ln();
         else if (!strcmp(currentCommand[0], "rm"))
             my_rm();
+        else if (!strcmp(currentCommand[0], "chown"))
+            my_chown();
         else if (!strcmp(currentCommand[0], "clear"))
             ::system("clear");
         else
@@ -1137,7 +1211,8 @@ int main(int argc, char *argv[])
     ::system("clear");
     Shell shell = Shell("127.0.0.1", 230, 4096);
     char msg[shell.STD_buffer];
-    json users = {0, 0, 1};
+    shell.groups = {2, 1, 0}; //[GID_0,GID_1......]
+    shell.users = {shell.groups[2], shell.groups[2], shell.groups[1]}; //[GID_user0,GID_user1......]
 
     try
     {
@@ -1145,7 +1220,7 @@ int main(int argc, char *argv[])
             throw help;
 
         int user = ((int)argv[1][0] - 48);
-        shell.user = {{"GID", users[user]}, {"UID", user}};
+        shell.user = {{"GID", shell.users[user]}, {"UID", user}};
 
         struct hostent *host = gethostbyname(shell.serverIp);
         sockaddr_in sendSockAddr;

@@ -48,6 +48,9 @@ using namespace std;
 
             json user; //UID AND GID
             string curDir; //current working directory
+            json users; //[GID_user0,GID_user1,GID_user2]
+            json groups; //[0,3,1]
+
             string *history; //TODO
 
             //CURRENT COMMAND SPLITTED BY " "
@@ -73,6 +76,7 @@ using namespace std;
             void my_mv();
             void my_ln();
             void my_rm();
+            void my_chown();
 
             //HELPER FUNCTIONS (standalone functions)
             char **line_splitter(char *line, string splitter);
@@ -100,6 +104,8 @@ using namespace std;
             string ERROR_file_not_imported = "Error while trying to import the file";
             string ERROR_file_not_created = "File NOT created :(";
             string ERROR_not_a_dir = "Not a directory";
+            string ERROR_user_notfound = "ilegal user";
+            string ERROR_group_notfound = "ilegal group";
 
     };
 
