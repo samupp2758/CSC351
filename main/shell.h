@@ -106,6 +106,7 @@ using namespace std;
             string ERROR_file_not_imported = "Error while trying to import the file";
             string ERROR_file_not_created = "File NOT created :(";
             string ERROR_not_a_dir = "Not a directory";
+            string ERROR_not_file = "Not a file";
             string ERROR_user_notfound = "ilegal user";
             string ERROR_group_notfound = "ilegal group";
             string ERROR_notenough_space = ": Not enough space!!";

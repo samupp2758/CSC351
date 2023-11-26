@@ -939,51 +939,59 @@ void Shell::my_cat()
         throw ERROR_args_missing;
     }
 
-    if (currentCommand[2])
-    {
-        throw ERROR_args_overflow;
-    }
+    int i = 1;
+    while(currentCommand[i] != nullptr){
+        try{
+            file_path = to_abspath(curDir, currentCommand[i]);
 
-    file_path = to_abspath(curDir, currentCommand[1]);
+            int file_inode_number = testPath(file_path);
 
-    int file_inode_number = testPath(file_path);
+            if(testDirectory(file_path,true)){
+                throw ERROR_not_file;
+            }
 
-    // Testing permissions with the file we are trying to read
-    testPermissions(file_path, true, false, false);
+            // Testing permissions with the file we are trying to read
+            testPermissions(file_path, true, false, false);
 
-    // Gets the size of the file
-    json size_res_json = request({{"call", "my_Read_Size"}, {"inodeNumber", file_inode_number}});
-    file_size = size_res_json["size"];
+            // Gets the size of the file
+            json size_res_json = request({{"call", "my_Read_Size"}, {"inodeNumber", file_inode_number}});
+            file_size = size_res_json["size"];
 
-    int position = 0;
-    int buffer_size = 1024;
-    while (position < file_size)
-    {
+            int position = 0;
+            int buffer_size = 1024;
+            while (position < file_size)
+            {
 
-        if ((position + buffer_size) >= file_size)
-        {
-            buffer_size = file_size - position;
+                if ((position + buffer_size) >= file_size)
+                {
+                    buffer_size = file_size - position;
+                }
+
+                char *block_received = new char[buffer_size];
+                int size_ = request_read({{"call", "my_read"},
+                                        {"inodeNumber", file_inode_number},
+                                        {"nBytes", buffer_size},
+                                        {"size", file_size},
+                                        {"position", position}},
+                                        block_received);
+
+                int i = 0;
+                while (i < buffer_size)
+                {
+                    cout << block_received[i];
+                    i++;
+                }
+
+                position += buffer_size;
+                /// cout<<endl<<count<<" | "<<(int)size_res_json["size"]<<endl;
+            }
+            cout << endl;
+
+        }catch(string e){
+            cout<<e<<endl;
         }
-
-        char *block_received = new char[buffer_size];
-        int size_ = request_read({{"call", "my_read"},
-                                  {"inodeNumber", file_inode_number},
-                                  {"nBytes", buffer_size},
-                                  {"size", file_size},
-                                  {"position", position}},
-                                 block_received);
-
-        int i = 0;
-        while (i < buffer_size)
-        {
-            cout << block_received[i];
-            i++;
-        }
-
-        position += buffer_size;
-        /// cout<<endl<<count<<" | "<<(int)size_res_json["size"]<<endl;
+        i++;
     }
-    cout << endl;
 }
 
 //******************************************************************************
