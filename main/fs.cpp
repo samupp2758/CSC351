@@ -206,6 +206,12 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
                 response["status"] = FS.copy_data(request["source"],request["destination"]);
                 //******************************************************************************
             }
+            else if (request["call"] == "my_write_dir")
+            {
+                response["status"] = true;
+                FS.my_write_dir(request["destination"],request["source"],request["dest_path"]);
+                //******************************************************************************
+            }
             else
             {
                 string data = "";
