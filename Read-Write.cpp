@@ -28,8 +28,12 @@ void FileSystem::createDataFile(unsigned int size, string name) {
     disk.close();
     disk.open(name, ios::out | ios::in | ios::binary | ios::trunc);
     char empty = 0;
-    for (unsigned int i = 0; i < size; i++) {
-        disk.write(&empty, 1); 
+    char* empty2 = new char[1024 * 1024];
+    for (int i = 0; i < 1024 * 1024; i++) {
+        empty2[i] = 0;
+    }
+    for (int i = 0; i < (size / (1024 * 1024)); i++) {
+        disk.write(empty2, 1024 * 1024);
     }
 }
 
@@ -59,7 +63,7 @@ void FileSystem::writeBlock(int blockNumber, char* data) {
         int position = blockNumber * BLOCKSIZE;
         disk.seekp(position);
         disk.write(reinterpret_cast<const char*>(data), BLOCKSIZE);
-        //cout << data << endl << endl;
+        disk.flush();
     } else {
         cout << "Invalid blockNumber\n";
     }
@@ -413,6 +417,38 @@ int FileSystem::my_Read_CTime(int inodeNumber) {
     int CTime = characters_To_Integer(cCTime);
     delete buffer;
     return CTime;
+}
+
+//******************************************************************************
+
+void FileSystem::my_set_last_ID(int inodeNumber, int GID) {
+    int blockNumber = (inodeNumber / 32) + 18;
+    int offset = (inodeNumber % 32) * 128;
+    char* buffer = readBlock(blockNumber);
+    char* cGID = integer_To_Characters(GID);
+    buffer[offset + 91] = cGID[0];
+    buffer[offset + 92] = cGID[1];
+    buffer[offset + 93] = cGID[2];
+    buffer[offset + 94] = cGID[3];
+    writeBlock(blockNumber, buffer);
+    delete cGID, buffer;
+}
+
+//******************************************************************************
+
+int FileSystem::my_read_last_ID(int inodeNumber) {
+    int blockNumber = (inodeNumber / 32) + 18;
+    int offset = (inodeNumber % 32) * 128;
+    char* buffer = readBlock(blockNumber);
+    char cInteger[4];
+    cInteger[0] = buffer[offset + 91];
+    cInteger[1] = buffer[offset + 92];
+    cInteger[2] = buffer[offset + 93];
+    cInteger[3] = buffer[offset + 94];
+
+    int result = characters_To_Integer(cInteger);
+    delete buffer;
+    return result;
 }
 
 //******************************************************************************
@@ -919,7 +955,7 @@ bool FileSystem::my_Add_Address_Indirect(char* block, int location, int blockNum
 
 //******************************************************************************
 
-bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNumber, bool full) {
+bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNumber, bool full, int inodeNumber, int& tID) {
     bool success = false;
     int DIndirect;
     if (!block[location] && !block[location + 1] && !block[location + 2] && !block[location + 3]) {
@@ -950,14 +986,22 @@ bool FileSystem::my_Add_Address_DIndirect(char* block, int location, int blockNu
     if (!full) {
         //cout << "DIndirect" << DIndirect << endl;
         char* buffer = readBlock(DIndirect);
-        for (int i = 0; i < 4096; i += 4) {
+        int ID = my_read_last_ID(inodeNumber);
+        //int num = num ? (ID - 2) * 4: 0;
+        for (int i = (ID - 2) * 4; i < 4096; i += 4) {
             success = my_Add_Address_Indirect(buffer, i, blockNumber, full);
+            //cout << "i " << i << endl;
             if (full) {
                 break;
             }
             if (success) {
                 //cerr << "ran ran ran" << endl;
                 writeBlock(DIndirect, buffer);
+                int num = (i/4 + 2);
+                //my_set_last_ID(inodeNumber, num);
+                tID = num;
+                my_set_last_ID(inodeNumber, num);
+                //my_read_last_ID(inodeNumber);
                 break;
             }
         }
@@ -977,39 +1021,53 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
 
     char cAddress[4];
     int address;
+    int tID;
+
+    int ID = my_read_last_ID(inodeNumber);
 
     //Search the normal addresses in the inode.
-    for (int i = 0; i < 12; i++) {
-        cAddress[0] = buffer[offset + i * 4];
-        cAddress[1] = buffer[offset + i * 4 + 1];
-        cAddress[2] = buffer[offset + i * 4 + 2];
-        cAddress[3] = buffer[offset + i * 4 + 3];
-        address = characters_To_Integer(cAddress);
-        if (address == 0) { //Set the empty address to blockNumber.
-            char* cBlockNumber = integer_To_Characters(blockNumber);
-            buffer[offset + i * 4] = cBlockNumber[0];
-            buffer[offset + i * 4 + 1] = cBlockNumber[1];
-            buffer[offset + i * 4 + 2] = cBlockNumber[2];
-            buffer[offset + i * 4 + 3] = cBlockNumber[3];
-            writeBlock(location[0], buffer);
-            found = true;
-            delete cBlockNumber;
-            break;
-        }
-    }
+        for (int i = 0; i < 12; i++) {
+                cAddress[0] = buffer[offset + i * 4];
+                cAddress[1] = buffer[offset + i * 4 + 1];
+                cAddress[2] = buffer[offset + i * 4 + 2];
+                cAddress[3] = buffer[offset + i * 4 + 3];
+                address = characters_To_Integer(cAddress);
+                if (address == 0) { //Set the empty address to blockNumber.
+                    char* cBlockNumber = integer_To_Characters(blockNumber);
+                    buffer[offset + i * 4] = cBlockNumber[0];
+                    buffer[offset + i * 4 + 1] = cBlockNumber[1];
+                    buffer[offset + i * 4 + 2] = cBlockNumber[2];
+                    buffer[offset + i * 4 + 3] = cBlockNumber[3];
+                    writeBlock(location[0], buffer);
+                    found = true;
+                    delete cBlockNumber;
+                    my_set_last_ID(inodeNumber, 0);
+                    break;
+                }
+            }
+   
     //Search the first indirect block
-    if (!found) {
+    if (!found && ID <= 1) {
+        //my_set_last_ID(inodeNumber, 1);
         found = my_Add_Address_Indirect(buffer, location[1] + 67, blockNumber, full);
         writeBlock(location[0], buffer);
+
+        if (!found) {
+            my_set_last_ID(inodeNumber, 2);
+        }
         //cout << characters_To_Integer(&buffer[(location[1] + 67)]) << endl;
     }
-
     //Search the double indirect block
-    if (!found && !full) {
+    if (!found && !full && ID <= 1025) {
 
-        found = my_Add_Address_DIndirect(buffer, location[1] + 71, blockNumber, full);
+        //tID = my_read_last_ID(inodeNumber);
+        found = my_Add_Address_DIndirect(buffer, location[1] + 71, blockNumber, full, inodeNumber, tID);
+
         //cout << "last" << endl;
         writeBlock(location[0], buffer);
+        if (found) {
+            my_set_last_ID(inodeNumber, tID);
+        }
     }
 
     //Seaerch the triple indirect block
@@ -1045,7 +1103,7 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
         if (!full) {
             char* buffer2 = readBlock(TIndirect);
             for (int i = 0; i < 4096; i += 4) {
-                found = my_Add_Address_DIndirect(buffer2, i, blockNumber, full);
+                found = my_Add_Address_DIndirect(buffer2, i, blockNumber, full, inodeNumber, tID);
                 if (full) {
                     break;
                 }
@@ -1056,11 +1114,16 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
             }
             delete buffer2;
         }
+        if (my_read_last_ID(inodeNumber) != 1026) {
+            my_set_last_ID(inodeNumber, 1026);
+        }
     }
     if (full) { //Should already be true, but made it explicit.
         found = false;
     }
     
+    ID = my_read_last_ID(inodeNumber);
+
     delete location, buffer;
     return found;
 }
@@ -1078,13 +1141,16 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
     int blockNumber = (inodeNumber / 32) + 18;
     int offset = (inodeNumber % 32) * 128;
     char* buffer = readBlock(blockNumber);
+    //cerr << "ran 2.1" << endl;
     if (indirect_block == 0) {
+        //cerr << "ran 2.2" << endl;
         //First 12 addresses
         result = new int[12];
         for (int i = 0; i < 12; i++) {
             result[i] = characters_To_Integer(&buffer[i * 4 + 19 + offset]);
         }
     } else if (indirect_block == 1) {
+        //cerr << "ran 2.3" << endl;
         //First indirect block
         result = new int[1024];
         int indirectBlockNumber = characters_To_Integer(&buffer[67 + offset]);
@@ -1094,7 +1160,8 @@ int* FileSystem::get_addresses(int inodeNumber, int indirect_block){
         }
         delete indirectBuffer;
     } else if (indirect_block < 1026) {
-         char* buffer2 = readBlock((inodeNumber / 32) + 18);
+        //cerr << "ran 2.4" << endl;
+        char* buffer2 = readBlock((inodeNumber / 32) + 18);
         char* buffer3 = readBlock(characters_To_Integer(&buffer2[(inodeNumber % 32) * 128 + 71]));
         //for (int i = 0; i < 1024; i++) {
         //    cout << characters_To_Integer(&buffer3[i * 4]) << " ";
@@ -1414,10 +1481,14 @@ int FileSystem::my_read_dir(int directoryInodeNum, int position, int& inodeNumbe
 
     int result;
     //cout << "position: " << position << endl;
-
+    //cerr << "ran 1" << endl;
     int* blockNums = get_addresses(directoryInodeNum, position / (4194304));
     //cout << "first block of directory: " << (position/4096)%1024 << endl;
+        //cerr << "ran 2" << endl;
+
     char* buffer = readBlock(blockNums[(position/4096)%1024]);
+        //cerr << "ran 3" << endl;
+
     int offset = position % 4096;
     //cout << "Offset: " << offset << endl;
     //cout << "NextEntry: " << characters_To_Integer(&buffer[offset + 4]) << endl;
@@ -1428,6 +1499,8 @@ int FileSystem::my_read_dir(int directoryInodeNum, int position, int& inodeNumbe
     } else {
         inodeNumber = characters_To_Integer(&buffer[offset]);
         type = buffer[offset + 8];
+            //cerr << "ran 4" << endl;
+
 
         string temp = "";
         for (int i = 0; i < (int)buffer[offset + 9]; i++) {
@@ -1437,6 +1510,7 @@ int FileSystem::my_read_dir(int directoryInodeNum, int position, int& inodeNumbe
         //cout << endl;
         name = temp;
         //cout << "read: "<<temp<< endl;
+        //cerr << "ran 5" << endl;
 
         result = position + characters_To_Integer(&buffer[offset + 4]);
     }
@@ -1601,6 +1675,7 @@ int FileSystem::create_inode(char* mode, int user, int group) {
             my_Set_MTime(inodeNumber);
             my_Set_CTime(inodeNumber);
 
+            my_set_last_ID(inodeNumber, 0);
             my_Add_Address(inodeNumber, blockNumber);
         }
     }
@@ -1654,11 +1729,11 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
             currentByte++;
         }
 
-        cerr << "Number Of Blocks " << numberOfBlocks << endl;
-        cerr << "Starting Block " << startBlock << endl;
+        //cerr << "Number Of Blocks " << numberOfBlocks << endl;
+        //cerr << "Starting Block " << startBlock << endl;
 		for(int i = startBlock + 1; i < numberOfBlocks + startBlock; i++) {
             //cerr << "called" << endl;
-            cerr << "\nreading" << endl;
+            //cerr << "\nreading" << endl;
 
 			if (currentByte == nBytes) {
 				break;
@@ -1685,8 +1760,8 @@ char* FileSystem::my_Read(int inodeNumber, int position, int nBytes) {
 				break;
 			}
             delete temp;
-            cerr << "Block to write to " << fileBlocks[i] << endl;
-            cerr << "currentByte " << currentByte << endl;
+            //cerr << "Block to write to " << fileBlocks[i] << endl;
+            //cerr << "currentByte " << currentByte << endl;
 			
             temp = readBlock(fileBlocks[i]);
 			//cerr << "called";
@@ -1817,7 +1892,7 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                     //cout << " extended ";
                 }
                 buffer2 = readBlock(addresses[i]);
- 
+
                 for (int j = start; j < 4096; j++) {
                     if (bytesWritten >= nBytes) {
                         done = true;
@@ -1837,34 +1912,45 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
             delete addresses;
             currentID++;
         }
-        //cerr << "ran 1" << endl;
         //cout << "current id " << currentID << endl;
-        while (!done && extendedSuccess) {
-            cout << bytesWritten << endl;
+        //while (!done && extendedSuccess) {
+        while (!done) {
+
+            cout << bytesWritten << endl; //Debugging/progress report
             addresses = get_addresses(inodeNumber, currentID);
+            //int t = time(nullptr);
+
             for (int i = (currentBlock - 12) % 1024; i < 1024; i++) {
+                //cerr << "ran 1" << endl;
                 if (addresses[i] == 0) {
+                    //cerr << "ran 1.1" << endl;
                     extendedSuccess = my_extend(inodeNumber);
+                    //cerr << "ran 1.2" << endl;
                     delete addresses;
                     addresses = get_addresses(inodeNumber, currentID);
 
                     if (!extendedSuccess) {
+                        //cerr << "exited 1" << endl;
                         break;
                     }
                 }
+                //cerr << "time: " << (auto begin = std::chrono::high_resolution_clock::now() - t) << endl;
+                //t = time(nullptr);
+
                 buffer2 = readBlock(addresses[i]);
-                //cerr << "ran 3" << endl;
+                //cerr << "ran 2" << endl;
 
                 for (int j = start; j < 4096; j++) {
                     if (bytesWritten >= nBytes) {
                         done = true;
+                        //cerr << "exited 3" << endl;
                         break;
                     }
                     buffer2[j] = buffer[k];
                     bytesWritten++;
                     k++;
                 }
-                //cerr << "ran 4" << endl;
+                //cerr << "ran 3" << endl;
                 if (start > 0) {
                     start = 0;
                 }
@@ -1872,12 +1958,15 @@ bool FileSystem::my_Write(int inodeNumber, int position, int nBytes, char* buffe
                 currentBlock++;
                 delete buffer2;
                 if (done) {
+                    //cerr << "exited 1.5" << endl;
                     break;
                 }
+                //cerr << "ran 4" << endl;
             }
             currentID++;
             delete addresses;
             if (!extendedSuccess) {
+                //cerr << "exited 2" << endl;
                 break;
             }
         }
