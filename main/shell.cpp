@@ -1183,7 +1183,7 @@ void Shell::my_ln()
     json new_link = request({{"call", "my_write_dir"},
         {"destination", dest_parent_inode},
         {"source", source_inode},
-        {"dest_path", destination_path}});
+        {"dest_path", get_filename(destination_path)}});
 
     if(new_link["status"] != true){
         throw ERROR_file_not_created;
