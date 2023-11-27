@@ -19,6 +19,7 @@ class FileSystem {
     private:
         const int BLOCKSIZE = 4096;
         const int MAXBLOCKS = 524288;
+        int lastPositionC = 0;
 
     public:
         fstream disk;

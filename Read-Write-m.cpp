@@ -23,20 +23,126 @@ int main() {
 
     //cout << result[0] << " " << result[1];
     char* buffer = new char[4096];
-    FS.Create_New_FS("mix/disk.dat");
-    int dirInode = FS.my_mkdir("/directory", 15, 15);
+    FS.Create_New_FS("disk.dat");
+    cout << "done" << endl;
+    cout << "done" << endl;
+    cout << "done" << endl;
+    cout << "done" << endl;
+    cout << "done" << endl;
+
+    //FS.print_dir("/");
+
+
+
+    //FS.my_create("/delete", 0, 0);
+    //int dirInode = FS.my_mkdir("/directory", 15, 15);
 
     fstream file;
     //file.open("PH1_Design_Document.txt");
     
-    file.open("Read-Write.cpp"); 
+    
+    file.open("Gigafile.txt"); 
     file.seekg(0, ios::end);
     int length = file.tellg();
     file.seekg(0, ios::beg);
     char* fileData = new char[length];
     file.read(fileData, length);
     file.close();
+
+    //int num;
+    //FS.my_search_dir(0, "Gigafile2", num);
+    cerr << "ran" << endl;
+    int inodeNum = FS.my_create("/Gigafile2", 0, 0);
+    cerr << "ran" << endl;
+    bool result = FS.my_Write(inodeNum, 0, length, fileData);
+    cout << "\nresult " << result << endl;
+
+    //FS.my_set_last_ID(inodeNum, (100/5) + 2);
+    //cerr << "test " << FS.my_read_last_ID(inodeNum) << endl;
+
+    /*
+    file.open("25MBfile.txt"); 
+    file.seekg(0, ios::end);
+    length = file.tellg();
+    file.seekg(0, ios::beg);
+    fileData = new char[length];
+    file.read(fileData, length);
+    file.close();
+
     
+    result = FS.my_Write(inodeNum, 0, length, fileData);
+    cout << "\nresult " << result << endl;
+    */
+
+
+    
+    FS.print_dir("/");
+   
+    /*
+    char* c = new char[1];
+    file.open("100MBfile.txt", ios::out | ios::trunc);
+    for (int i = 0; i < 100 * pow(2, 20); i++) {
+        c[0] = (char)(rand() % 255);
+        file.write(c, 1);
+    }
+    file.close();
+    */
+
+    /*
+    FS.my_mkdir("/things", 0, 0);
+    int num = FS.my_mkdir("/moreThings1", 0, 0);
+    FS.my_mkdir("/moreThings2", 0, 0);
+    FS.my_mkdir("/moreThings3", 0, 0);
+    int removed = FS.my_mkdir("/moreThings4", 0, 0);
+    FS.my_mkdir("/moreThings5", 0, 0);
+    FS.print_dir("/");
+    FS.my_rmdir("/moreThings4");
+    */
+
+
+    /*
+    FS.my_create("/stuff", 0, 0);
+    FS.my_create("/stuff2", 0, 0);
+    cerr << "ran 1" << endl;
+    FS.my_write_dir(0, 1111, "name");
+    FS.my_write_dir(0, 1111, "tttt");
+    FS.my_create("/11111111111111111111111111111111111111111111111111111111111111", 0, 0);
+    FS.my_create("/2222222222222222222222222222222222222222222222222222222222222222", 0, 0);
+    FS.my_create("/333333333333333333333333333333333333333333333333333333333333333", 0, 0);
+    FS.my_create("/4444444444444444444444444444444444444444444444444444444444444444", 0, 0);
+    FS.my_create("/55555555555555555555555555555555555555555555555555555555555555", 0, 0);
+    FS.my_create("/66666666666666666666666666666666666666666666666666666666666666", 0, 0);
+    FS.my_create("/test1", 0, 0);
+    FS.my_create("/test2", 0, 0);
+    FS.my_create("/test3", 0, 0);
+    FS.my_create("/test4", 0, 0);
+    */
+
+    /*
+    for (int i = 0; i < 4096; i++) {
+        buffer[i] = 'A';
+    }
+    */
+
+    //FS.writeBlock(1042, buffer);
+    //FS.writeBlock(1044, buffer);
+
+    //FS.my_Write(num, 0, 4000, buffer);
+
+
+
+    //FS.writeBlock(1292, buffer);
+    //FS.writeBlock(1291, buffer);
+
+
+
+    //cout << "creation time of directory " << FS.my_Read_CTime(dirInode) << endl;
+    //cout << "CTime of moreThings " << FS.my_Read_CTime(num) << endl;
+    //cout << "CTime of removed " << FS.my_Read_CTime(removed) << endl;
+
+
+
+    /*
     char mode[] = {63, 224};
     int inodeNumber = FS.create_inode(mode, 1, 1);
     FS.my_write_dir(dirInode, inodeNumber, "text");
@@ -45,7 +151,7 @@ int main() {
     int nInode = FS.my_create("/directory/NewText", 0, 0);
 
     cout << "success: " << (FS.copy_data(inodeNumber, nInode) ? "success" : "failed") << endl;
-
+    */
 
     /*
     
@@ -66,13 +172,14 @@ int main() {
     
     */
 
+    
     cerr << "time to read" << endl;
-    
-    
-    char* result = FS.my_Read(nInode, 0, length);
+    int num;
+    FS.my_search_dir(0, "Gigafile2", num);
+    char* result2 = FS.my_Read(num, 0, length);
     //cerr << "ran" << endl;
     file.open("ResultsDoc.txt", ios::out | ios::binary);
-    file.write(result, length);
+    file.write(result2, length);
     file.close();
     
 
@@ -99,12 +206,16 @@ int main() {
     //FS.print_dir("/directory");
 
     
-    /*
-    for (int i = 0; i < 4096; i++) {
-        buffer[i] = 'A';
-    }
-    FS.writeBlock(1066, buffer);
+    
+    
+    //FS.writeBlock(1045, buffer);
+    //FS.writeBlock(1046, buffer);
+    //FS.writeBlock(1047, buffer);
+    //FS.writeBlock(1048, buffer);
 
+    
+
+    /*
     FS.writeBlock(1068, buffer);
     FS.writeBlock(1069, buffer);
     FS.writeBlock(1070, buffer);
