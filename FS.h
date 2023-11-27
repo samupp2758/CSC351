@@ -41,7 +41,7 @@ class FileSystem {
         bool my_extend(int inodeNumber);
         bool my_Add_Address(int inodeNumber, int blockNumber);
         bool my_Add_Address_Indirect(char* block, int location, int blockNumber, bool full);
-        bool my_Add_Address_DIndirect(char* block, int location, int blockNumber, bool full);
+        bool my_Add_Address_DIndirect(char* block, int location, int blockNumber, bool full, int inodeNumber, int& tID);
         int* get_addresses(int inodeNumber, int indirect_block);
         void my_write_dir(int directoryInodeNum, int entryInodeNum, string name);
         bool add_entry_to_block(int blockNumber, int entryInodeNum, string name);
@@ -82,6 +82,8 @@ class FileSystem {
         int* my_index_inodes(int inodeNumber);
         int get_block_use(int inodeNumber);
         bool copy_data(int sourceInode, int destInode);
+        void my_set_last_ID(int inodeNumber, int ID);
+        int my_read_last_ID(int inodeNumber);
 
         //Utility & char conversion
         bool* character_To_Binary(char c);
