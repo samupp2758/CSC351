@@ -1180,8 +1180,15 @@ void Shell::my_ln()
     testPermissions(source_path, false, false, true);
 
     //create new entry using create_newentry with the source inode and destination path
-    //json new_link = request({"call", my_write_dir(dest_parent_inode, source_inode, destination_path)});
+    json new_link = request({{"call", "my_write_dir"},
+        {"destination", dest_parent_inode},
+        {"source", source_inode},
+        {"dest_path", destination_path}});
 
+    if(new_link["status"] != true){
+        throw ERROR_file_not_created;
+
+    }
 }
 
 //******************************************************************************
