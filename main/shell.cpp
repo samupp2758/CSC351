@@ -1444,6 +1444,10 @@ int main(int argc, char *argv[])
         if (!argv[1])
             throw help;
 
+        if(argv[2] != nullptr){
+            shell.serverIp = argv[2];
+        }
+
         int user = ((int)argv[1][0] - 48);
         shell.user = {{"GID", shell.users[user]}, {"UID", user}};
 
