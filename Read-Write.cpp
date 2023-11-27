@@ -420,22 +420,24 @@ int FileSystem::my_Read_CTime(int inodeNumber) {
 
 //******************************************************************************
 
-void FileSystem::my_set_last_ID(int inodeNumber, int GID) {
+void FileSystem::my_set_last_ID(int inodeNumber, int ID) {
+    //Sets the position of the last indirect block written to for storing addresses.
     int blockNumber = (inodeNumber / 32) + 18;
     int offset = (inodeNumber % 32) * 128;
     char* buffer = readBlock(blockNumber);
-    char* cGID = integer_To_Characters(GID);
-    buffer[offset + 91] = cGID[0];
-    buffer[offset + 92] = cGID[1];
-    buffer[offset + 93] = cGID[2];
-    buffer[offset + 94] = cGID[3];
+    char* cID = integer_To_Characters(ID);
+    buffer[offset + 91] = cID[0];
+    buffer[offset + 92] = cID[1];
+    buffer[offset + 93] = cID[2];
+    buffer[offset + 94] = cID[3];
     writeBlock(blockNumber, buffer);
-    delete cGID, buffer;
+    delete cID, buffer;
 }
 
 //******************************************************************************
 
 int FileSystem::my_read_last_ID(int inodeNumber) {
+    //Reads the position of the last indirect block written to when storing addresses.
     int blockNumber = (inodeNumber / 32) + 18;
     int offset = (inodeNumber % 32) * 128;
     char* buffer = readBlock(blockNumber);
