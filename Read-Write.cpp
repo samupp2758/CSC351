@@ -633,19 +633,21 @@ int FileSystem::allocate() {
     //Returns the beginning number of 8 consecutive free blocks. 0 means no blocks were free.
     char* buffer = new char[5];
     int blockNumber = 0;
-    int bitmap = 1;
+    int bitmap = 1 + lastPositionC / 4096;
     int emptyBitCounter = 0;
     int startingBlockTracker = 0;
     bool* currentBits;
     bool exit = false;
+    int iteration = 0;
+    //cerr << "bitmap " << bitmap;
     //cout << "allocate 1" << endl;
-    while (!blockNumber && bitmap <= 16) {
+    while (!blockNumber && iteration < 16) {
         //cerr << "allocate bitmap" << bitmap << endl;
         delete buffer;
         buffer = readBlock(bitmap);
         emptyBitCounter = 0;
         //cerr << "bitmap 2" << endl;
-        for (int i = 0; i < 4096; i++) {
+        for (int i = lastPositionC % 4096; i < 4096; i++) {
             currentBits = character_To_Binary(buffer[i]);
             //cout << "char: " << (int)buffer[i] << endl;
             //cout << "allocate 2" << endl;
@@ -674,6 +676,7 @@ int FileSystem::allocate() {
                     blockNumber = (bitmap - 1) * 32768 + i * 8;
                     buffer[i] = binary_To_Character(currentBits);
                     writeBlock(bitmap, buffer);
+                    lastPositionC = (bitmap - 1) * 4096 + i;
                     break;
                 } else if(emptyBitCounter == 8){
                     //cerr << "allocate 5" << endl;
@@ -698,6 +701,7 @@ int FileSystem::allocate() {
                     writeBlock(bitmap, buffer);
                     //get the starting number of block
                     blockNumber = (bitmap - 1) * 32768 + (i-1) * 8 + startingBlockTracker;
+                    lastPositionC = (bitmap - 1) * 4096 + i - 1;
                     exit = true;
                     break;
                 }
@@ -707,10 +711,18 @@ int FileSystem::allocate() {
                 break;
             }
         }
+        if (exit) {
+            break;
+        }
+        lastPositionC = 0;
         //cerr << "allocate 9" << endl;
         //delete buffer;
         //cerr << "allocate 9.3" << endl;
         bitmap++;
+        if (bitmap >= 17) {
+            bitmap = 1; 
+        }
+        iteration++;
         //cerr << "allocate 9.5" << endl;
     }
     //cerr << "allocate 10" << endl;
@@ -2069,7 +2081,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     createDataFile(pow(2, 31), name);
-    //createDataFile(1024 * 1024 * 8, name);
+    //createDataFile(1024 * 1024 * 32, name);
     //FileName = name;
     char* buffer;
 
