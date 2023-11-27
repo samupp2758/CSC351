@@ -512,6 +512,7 @@ void FileSystem::mark_inode_free(int inodeNumber) {
 //******************************************************************************
 //Seems good
 void FileSystem::mark_blocks_free(int* blockNumbers, int size) {
+    cerr << "why" << endl;
     //Takes a list of block numbers and marks them free on the block bit map.
     sort(blockNumbers, blockNumbers + size);
     //for (int i = 0; i < size; i++) {
@@ -523,18 +524,31 @@ void FileSystem::mark_blocks_free(int* blockNumbers, int size) {
     char* buffer;
     int offsetByte;
     bool* bits;
+    //cerr << "ran 7" << endl;
     for (int i = 1; i < 17; i++) {
         if (blockNumbers[pos] < 32768 * i) {
             buffer = readBlock(i);
+            //cerr << "ran 7.1" << endl;
+            //cerr << "block " << i << endl;
             while (blockNumbers[pos] < 32768 * i && pos < size) {
+                //cerr << "ran 7.2" << endl;
                 offsetByte = (blockNumbers[pos] % 32768) / 8;
+                //cerr << "ran 7.3" << endl;
                 bits = character_To_Binary(buffer[offsetByte]);
+                //cerr << "ran 7.4" << endl;
                 bits[blockNumbers[pos] % 8] = false;
+                //cerr << "ran 8" << endl;
                 buffer[offsetByte] = binary_To_Character(bits);
                 delete bits;
+                //cerr << "ran 9" << endl;
                 pos++;
             }
             writeBlock(i, buffer);
+            if ( i == 1) {
+                for (int k = 0; k < 4096; k++) {
+                    cerr << (int)buffer[k];
+                }
+            }
             delete buffer;
             if (pos >= size) {
                 break;
@@ -547,7 +561,7 @@ void FileSystem::mark_blocks_free(int* blockNumbers, int size) {
 //Need to test
 void FileSystem::my_Delete(int inodeNumber) {
     //Deletes an inode
-
+    
     //Free all the blocks of the i-node
     int indirectBlock = 0;
     int* blockNums = get_addresses(inodeNumber, indirectBlock);
@@ -561,18 +575,26 @@ void FileSystem::my_Delete(int inodeNumber) {
     mark_blocks_free(blockNums, end);
     delete blockNums;
     if (end == 12) {
-        end = 4096;
-        while (end == 4096 && indirectBlock < 1049602) {
+        //cerr << "ran 1" << endl;
+        end = 1024;
+        while (end == 1024 && indirectBlock < 1049602) {
+            //cerr << "ran 2" << endl;
             indirectBlock++;
             blockNums = get_addresses(inodeNumber, indirectBlock);
-            for (int i = 0; i < 4096; i++) {
+            for (int i = 0; i < 1024; i++) {
+                //cerr << "ran 3" << endl;
                 if (blockNums[i] == 0) {
                     end = i;
                     break;
                 }
+                //cerr << "ran 4" << endl;
             }
+            //cerr << "ran 5" << endl;
+            //cerr << "end " << end;
             mark_blocks_free(blockNums, end);
-            delete blockNums;
+            //cerr << "ran 6" << endl;
+            //cerr << "called " << endl;
+            //delete blockNums;
         }
     }
 
@@ -580,7 +602,7 @@ void FileSystem::my_Delete(int inodeNumber) {
     int blockNumber = (inodeNumber / 32) + 18;
     int offset = (inodeNumber % 32) * 128;
     char* buffer = readBlock(blockNumber);
-    for (int i = 0; i <= 90; i++) {
+    for (int i = 0; i <= 95; i++) {
         buffer[offset + i] = 0;
     }
     writeBlock(blockNumber, buffer);
@@ -2052,8 +2074,10 @@ bool FileSystem::copy_data(int sourceInode, int destInode) {
     int size = my_Read_Size(sourceInode);
     char* buffer;
     buffer = my_Read(sourceInode, 0, size);
+    cerr << "size " << size << endl;
     if (buffer) { //Check that read was successful.
         rc = my_Write(destInode, 0, size, buffer);
+        cerr << "rc " << rc << endl;
         delete buffer;
     }
     return rc;
@@ -2081,7 +2105,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     createDataFile(pow(2, 31), name);
-    //createDataFile(1024 * 1024 * 32, name);
+    //createDataFile(1024 * 1024 * 16, name);
     //FileName = name;
     char* buffer;
 
