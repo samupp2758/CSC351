@@ -52,10 +52,12 @@ int main() {
     //int num;
     //FS.my_search_dir(0, "Gigafile2", num);
     cerr << "ran" << endl;
-    int inodeNum = FS.my_create("/Gigafile2", 0, 0);
+    int inodeNum = FS.my_create("/Gigafile", 0, 0);
     cerr << "ran" << endl;
     bool result = FS.my_Write(inodeNum, 0, length, fileData);
     cout << "\nresult " << result << endl;
+
+    FS.print_block_bitmap();
 
     //FS.my_set_last_ID(inodeNum, (100/5) + 2);
     //cerr << "test " << FS.my_read_last_ID(inodeNum) << endl;
@@ -175,7 +177,7 @@ int main() {
     
     cerr << "time to read" << endl;
     int num;
-    FS.my_search_dir(0, "Gigafile2", num);
+    FS.my_search_dir(0, "Gigafile", num);
     char* result2 = FS.my_Read(num, 0, length);
     //cerr << "ran" << endl;
     file.open("ResultsDoc.txt", ios::out | ios::binary);
