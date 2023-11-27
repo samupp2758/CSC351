@@ -27,6 +27,7 @@
 #include <set>
 #include<sstream>
 #include <filesystem>
+#include <vector>
 using json = nlohmann::json;
 using namespace std;
 #define bzero(b,len) (memset((b), '\0', (len)), (void) 0)
@@ -110,6 +111,8 @@ using namespace std;
             string ERROR_user_notfound = "ilegal user";
             string ERROR_group_notfound = "ilegal group";
             string ERROR_notenough_space = ": Not enough space!!";
+            string ERROR_is_a_dir = "Source is a directory.";
+            string ERROR_overwrite_directory = "cannot overwrite directory";
 
     };
 
