@@ -1,5 +1,6 @@
 .DS_Store
 main/test/*
+main/received/*
 main/fs
 main/shell
 main/*.data

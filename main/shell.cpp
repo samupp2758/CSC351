@@ -268,21 +268,22 @@ int Shell::testPath(string path, bool noThrow)
 /*Tests to see if the path points to a directory or not*/
 bool Shell::testDirectory(string path, bool noThrow)
 {
-    int inodeNumber = testPath(path,noThrow);
     bool rc = false;
-
-    json mode_res = request({{"call", "my_Read_Mode"}, {"inodeNumber", inodeNumber}});
-    string mode_pretty = format_mode(mode_res["mode"]);
-    if (mode_pretty[0] != 'd')
-    {
-        if (!noThrow)
+    int inodeNumber = testPath(path,noThrow);
+    if(inodeNumber != -1){
+        json mode_res = request({{"call", "my_Read_Mode"}, {"inodeNumber", inodeNumber}});
+        string mode_pretty = format_mode(mode_res["mode"]);
+        if (mode_pretty[0] != 'd')
         {
-            throw ERROR_not_a_dir;
+            if (!noThrow)
+            {
+                throw ERROR_not_a_dir;
+            }
         }
-    }
-    else
-    {
-        rc = true;
+        else
+        {
+            rc = true;
+        }
     }
     return rc;
 }
@@ -1209,6 +1210,7 @@ void Shell::my_ln()
     string help = "usage: ln source destination";
     string source_path;
     string destination_path;
+    string filename;
     int source_inode;
     int destination_inode;
     int dest_parent_inode;
@@ -1232,19 +1234,32 @@ void Shell::my_ln()
     dest_parent_inode = testPath(get_parent_path(destination_path));
     destination_inode = testPath(destination_path, true);
 
-    // Tests if destinations parent exists (if not even its parents exists, throw error)
-    testPath(get_parent_path(destination_path));
-
     //test permissions
     testPermissions(source_path, false, false, true);
 
+    filename = get_filename(destination_path);
+
+    if((testDirectory(source_path,true) && (testPath(destination_path,true) != -1) && !testDirectory(destination_path,true))){
+        throw ERROR_overwrite_directory;
+    }
+
+    if(!testDirectory(source_path,true) && (testPath(destination_path,true) != -1) && testDirectory(destination_path,true)){
+        dest_parent_inode = testPath(destination_path,true);
+        filename = get_filename(source_path);
+
+        destination_path.append("/");
+        destination_path.append(filename);
+        if(testDirectory(destination_path,true)){
+            throw ERROR_overwrite_directory;
+        }
+    }
 
 
     //create new entry using create_newentry with the source inode and destination path
     json new_link = request({{"call", "my_write_dir"},
         {"destination", dest_parent_inode},
         {"source", source_inode},
-        {"dest_path", get_filename(destination_path)}});
+        {"dest_path", filename}});
 
     if(new_link["status"] != true){
         throw ERROR_file_not_created;
