@@ -1101,6 +1101,7 @@ void Shell::my_cp()
                                         {"destination", destination_inode_number}});
 
             if (copy_res_json["status"] == nullptr || !copy_res_json["status"]){
+                remove_file(destination);
                 throw ERROR_generic;
             }
             i_2++;
