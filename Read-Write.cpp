@@ -63,7 +63,6 @@ void FileSystem::writeBlock(int blockNumber, char* data) {
         int position = blockNumber * BLOCKSIZE;
         disk.seekp(position);
         disk.write(reinterpret_cast<const char*>(data), BLOCKSIZE);
-        disk.flush();
     } else {
         cout << "Invalid blockNumber\n";
     }
@@ -1026,25 +1025,25 @@ bool FileSystem::my_Add_Address(int inodeNumber, int blockNumber) {
     int ID = my_read_last_ID(inodeNumber);
 
     //Search the normal addresses in the inode.
-        for (int i = 0; i < 12; i++) {
-                cAddress[0] = buffer[offset + i * 4];
-                cAddress[1] = buffer[offset + i * 4 + 1];
-                cAddress[2] = buffer[offset + i * 4 + 2];
-                cAddress[3] = buffer[offset + i * 4 + 3];
-                address = characters_To_Integer(cAddress);
-                if (address == 0) { //Set the empty address to blockNumber.
-                    char* cBlockNumber = integer_To_Characters(blockNumber);
-                    buffer[offset + i * 4] = cBlockNumber[0];
-                    buffer[offset + i * 4 + 1] = cBlockNumber[1];
-                    buffer[offset + i * 4 + 2] = cBlockNumber[2];
-                    buffer[offset + i * 4 + 3] = cBlockNumber[3];
-                    writeBlock(location[0], buffer);
-                    found = true;
-                    delete cBlockNumber;
-                    my_set_last_ID(inodeNumber, 0);
-                    break;
-                }
-            }
+    for (int i = 0; i < 12; i++) {
+        cAddress[0] = buffer[offset + i * 4];
+        cAddress[1] = buffer[offset + i * 4 + 1];
+        cAddress[2] = buffer[offset + i * 4 + 2];
+        cAddress[3] = buffer[offset + i * 4 + 3];
+        address = characters_To_Integer(cAddress);
+        if (address == 0) { //Set the empty address to blockNumber.
+            char* cBlockNumber = integer_To_Characters(blockNumber);
+            buffer[offset + i * 4] = cBlockNumber[0];
+            buffer[offset + i * 4 + 1] = cBlockNumber[1];
+            buffer[offset + i * 4 + 2] = cBlockNumber[2];
+            buffer[offset + i * 4 + 3] = cBlockNumber[3];
+            writeBlock(location[0], buffer);
+            found = true;
+            delete cBlockNumber;
+            my_set_last_ID(inodeNumber, 0);
+            break;
+        }
+    }
    
     //Search the first indirect block
     if (!found && ID <= 1) {
