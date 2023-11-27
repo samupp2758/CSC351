@@ -638,10 +638,10 @@ int FileSystem::allocate() {
     int startingBlockTracker = 0;
     bool* currentBits;
     bool exit = false;
-    int i = 0;
+    int iteration = 0;
     //cerr << "bitmap " << bitmap;
     //cout << "allocate 1" << endl;
-    while (!blockNumber && i < 16) {
+    while (!blockNumber && iteration < 16) {
         //cerr << "allocate bitmap" << bitmap << endl;
         delete buffer;
         buffer = readBlock(bitmap);
@@ -722,7 +722,7 @@ int FileSystem::allocate() {
         if (bitmap >= 17) {
             bitmap = 1; 
         }
-        i++;
+        iteration++;
         //cerr << "allocate 9.5" << endl;
     }
     //cerr << "allocate 10" << endl;
@@ -2081,7 +2081,7 @@ int FileSystem::my_create(string path, int user, int group) {
 //Somewhat tested
 void FileSystem::Create_New_FS(string name) {
     createDataFile(pow(2, 31), name);
-    //createDataFile(1024 * 1024 * 8, name);
+    //createDataFile(1024 * 1024 * 32, name);
     //FileName = name;
     char* buffer;
 
