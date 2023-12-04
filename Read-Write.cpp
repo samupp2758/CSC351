@@ -512,46 +512,50 @@ void FileSystem::mark_inode_free(int inodeNumber) {
 //******************************************************************************
 //Seems good
 void FileSystem::mark_blocks_free(int* blockNumbers, int size) {
-    cerr << "why" << endl;
-    //Takes a list of block numbers and marks them free on the block bit map.
-    sort(blockNumbers, blockNumbers + size);
-    //for (int i = 0; i < size; i++) {
-    //    cout << blockNumbers[i] << endl;
-    //}
-    //cerr << "size " << size << endl;
+    //cerr << "why" << endl;
+    if (size > 0) {
+        //Takes a list of block numbers and marks them free on the block bit map.
+        sort(blockNumbers, blockNumbers + size);
+        //for (int i = 0; i < size; i++) {
+        //    cout << blockNumbers[i] << endl;
+        //}
+        //cerr << "size " << size << endl;
 
-    int pos = 0;
-    char* buffer;
-    int offsetByte;
-    bool* bits;
-    //cerr << "ran 7" << endl;
-    for (int i = 1; i < 17; i++) {
-        if (blockNumbers[pos] < 32768 * i) {
-            buffer = readBlock(i);
-            //cerr << "ran 7.1" << endl;
-            //cerr << "block " << i << endl;
-            while (blockNumbers[pos] < 32768 * i && pos < size) {
-                //cerr << "ran 7.2" << endl;
-                offsetByte = (blockNumbers[pos] % 32768) / 8;
-                //cerr << "ran 7.3" << endl;
-                bits = character_To_Binary(buffer[offsetByte]);
-                //cerr << "ran 7.4" << endl;
-                bits[blockNumbers[pos] % 8] = false;
-                //cerr << "ran 8" << endl;
-                buffer[offsetByte] = binary_To_Character(bits);
-                delete bits;
-                //cerr << "ran 9" << endl;
-                pos++;
-            }
-            writeBlock(i, buffer);
-            if ( i == 1) {
-                for (int k = 0; k < 4096; k++) {
-                    cerr << (int)buffer[k];
+        int pos = 0;
+        char* buffer;
+        int offsetByte;
+        bool* bits;
+        //cerr << "ran 7" << endl;
+        for (int i = 1; i < 17; i++) {
+            if (blockNumbers[pos] < 32768 * i) {
+                buffer = readBlock(i);
+                //cerr << "ran 7.1" << endl;
+                //cerr << "block " << i << endl;
+                while (blockNumbers[pos] < 32768 * i && pos < size) {
+                    //cerr << "ran 7.2" << endl;
+                    offsetByte = (blockNumbers[pos] % 32768) / 8;
+                    //cerr << "ran 7.3" << endl;
+                    bits = character_To_Binary(buffer[offsetByte]);
+                    //cerr << "ran 7.4" << endl;
+                    bits[blockNumbers[pos] % 8] = false;
+                    //cerr << "ran 8" << endl;
+                    buffer[offsetByte] = binary_To_Character(bits);
+                    delete bits;
+                    //cerr << "ran 9" << endl;
+                    pos++;
                 }
-            }
-            delete buffer;
-            if (pos >= size) {
-                break;
+                writeBlock(i, buffer);
+                /*
+                if ( i == 1) {
+                    for (int k = 0; k < 4096; k++) {
+                        cerr << (int)buffer[k];
+                    }
+                }
+                */
+                delete buffer;
+                if (pos >= size) {
+                    break;
+                }
             }
         }
     }
@@ -602,6 +606,31 @@ void FileSystem::my_Delete(int inodeNumber) {
     int blockNumber = (inodeNumber / 32) + 18;
     int offset = (inodeNumber % 32) * 128;
     char* buffer = readBlock(blockNumber);
+
+    //Delete single indirect block
+    int IDNumber = characters_To_Integer(&buffer[offset + 67]);
+    if (IDNumber != 0) {
+        mark_blocks_free(&IDNumber, 1);
+    }
+    
+    //Delete the double indirect block
+    int DIDNumber = characters_To_Integer(&buffer[offset + 71]);
+    if (DIDNumber != 0) {
+        char* DIDbuffer = readBlock(DIDNumber);
+        int IDNumbers[1024]; 
+        int end = 0;
+        for (int i = 0; i < 1024; i++) {
+            if (characters_To_Integer(&DIDbuffer[i * 4]) != 0) {
+                IDNumbers[i] = characters_To_Integer(&DIDbuffer[i * 4]);
+            } else {
+                end = i;
+                break;
+            }
+        }
+        mark_blocks_free(IDNumbers, end);
+        mark_blocks_free(&DIDNumber, 1);
+    }
+
     for (int i = 0; i <= 95; i++) {
         buffer[offset + i] = 0;
     }
@@ -2232,12 +2261,13 @@ void FileSystem::print_block_bitmap() {
     for (int i = 0; i < 16; i++) {
         buffer = readBlock(1 + i);
         for (int j = 0; j < 4096; j++) {
-            bits = character_To_Binary(buffer[i]);
+            bits = character_To_Binary(buffer[j]);
             for (int k = 0; k < 8; k++) {
                 cout << bits[k];
             }
             delete bits;
         }
+        cout << "\n\n";
         delete buffer;
     }
 }
