@@ -27,7 +27,7 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
 {
     FileSystem FS(this->file_name);
     json response;
-    char *res = new char[4096];
+    char *res = new char[8192];
     if (strcmp(&msg[0], "exit"))
     {
         if (writing)
@@ -76,10 +76,17 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
                     inodenumber,
                     name,
                     type);
-                response["nextPos"] = nextPos;
-                response["inodeNumber"] = inodenumber;
-                response["type"] = type;
-                response["name"] = name;
+
+                cout<<inodenumber<<endl;
+                response["nextPos"] = nextPos < -1 ? -1 : nextPos;
+                response["inodeNumber"] = inodenumber < -1 ? -1 : inodenumber;
+                if(inodenumber >= 0){
+                    response["type"] = type;
+                    response["name"] = name;
+                }else{
+                    response["type"] = "";
+                    response["name"] = "";
+                }
                 //******************************************************************************
             }
             else if (request["call"] == "my_Read_Mode")
@@ -261,7 +268,7 @@ int main(int argc, char *argv[])
     string help = "usage ./fs filesytem.dat [0 or 1 | open or create]\n*\n*";
     ::system("clear");
     int port = 230;
-    int buff_size = 4096;
+    int buff_size = 8192;
     char msg[buff_size]; // message is 4096 bytes long
     try
     {
