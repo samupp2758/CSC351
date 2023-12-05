@@ -1,13 +1,23 @@
 #ifndef S_H
 #define S_H
 
+#include <ApplicationServices/ApplicationServices.h>
+#include <CoreFoundation/CoreFoundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <Carbon/Carbon.h>
+#include <thread>
+#include <functional>
+#include <shared_mutex>
+#include <unordered_map>
 #include <chrono>
+#include <stdio.h>
+
+
 #include <termios.h>
 #include <typeinfo>
 #include <iostream>
 #include <cstring>
 #include <string>
-#include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -28,11 +38,23 @@
 #include<sstream>
 #include <filesystem>
 #include <vector>
+#include <limits>
 using json = nlohmann::json;
 using namespace std;
 #define bzero(b,len) (memset((b), '\0', (len)), (void) 0)
 
 
+struct EventTap {
+    CFMachPortRef handle;
+    CFRunLoopSourceRef runloop_source;
+    CGEventMask mask;
+
+    EventTap(void);
+};
+
+EventTap::EventTap(){
+
+}
 
     class Shell{
         private:

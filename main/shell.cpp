@@ -1447,14 +1447,66 @@ void Shell::execute(string msg)
     }
 }
 
+
+CGEventRef on_keystroke(
+    CGEventTapProxy proxy,
+    CGEventType type,
+    CGEventRef event,
+    void *data
+) {
+    switch (type) {
+        case kCGEventKeyDown: {   
+            auto key_code = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);                     
+            cout<<key_code;
+            if(key_code == 125 || key_code == 126){
+                cout<<"pressed";
+            }
+            //struct EventTap *event_tap = (struct EventTap *) data;
+            break;
+        };
+        default:{
+            //printf("lol");
+            break;
+        }
+    }
+
+    return event;
+};
+
 int main(int argc, char *argv[])
 {
+
+    struct EventTap event_tap = EventTap();
+
+    event_tap.mask = (1 << kCGEventKeyDown) | (1 << NX_SYSDEFINED);
+
+    event_tap.handle = ::CGEventTapCreate(
+        kCGSessionEventTap,
+        kCGHeadInsertEventTap,
+        kCGEventTapOptionDefault,
+        event_tap.mask,
+        on_keystroke,
+        &event_tap
+    );
+
+   
+    event_tap.runloop_source = CFMachPortCreateRunLoopSource(
+        kCFAllocatorDefault,
+        event_tap.handle,
+        0 
+    );
+ 
+    CFRunLoopAddSource(CFRunLoopGetMain(), event_tap.runloop_source, kCFRunLoopCommonModes);
+     
+
+
     string help = "usage ./shell [0, 1 or 2 for the user to be used]\n*\n*";
     ::system("clear");
     Shell shell = Shell("127.0.0.1", 230, 8192);
     char msg[shell.STD_buffer];
     shell.groups = {2, 1, 0}; //[GID_0,GID_1......]
     shell.users = {shell.groups[2], shell.groups[2], shell.groups[1]}; //[GID_user0,GID_user1......]
+
 
     try
     {
@@ -1483,33 +1535,39 @@ int main(int argc, char *argv[])
             return -1;
         }
         cout << "Connected to the FS!" << endl;
-
-        while (1)
-        {
-            string data;
-            cout << shell.curDir << " -> ";
-            getline(cin, data);
-
-            memset(&msg, 0, sizeof(msg)); // c lear the buffer
-
-            string str = data;
-            str.erase(std::remove(str.begin(), str.end(), ' '), str.end()); // Verfiy if the currentCommand is empty
-
-            if (::strlen(&str[0]) > 0)
+/*
+            while (1)
             {
-                if (data == "exit" || data == "shutdown")
+                string data;
+                cout << shell.curDir << " -> ";
+                getline(cin, data);
+                
+
+                memset(msg, 0, sizeof(msg)); // c lear the buffer
+
+                string str = data;
+                str.erase(std::remove(str.begin(), str.end(), ' '), str.end()); // Verfiy if the currentCommand is empty
+
+                if (::strlen(&str[0]) > 0)
                 {
-                    strcpy(msg, data.c_str());
-                    cout << "Closing..." << endl;
-                    send(shell.clientSd, (char *)&msg, strlen(msg), 0);
-                    break;
-                }
-                else
-                {
-                    shell.execute(data);
+                    if (data == "exit" || data == "shutdown")
+                    {
+                        strcpy(msg, data.c_str());
+                        cout << "Closing..." << endl;
+                        send(shell.clientSd, (char *)&msg, strlen(msg), 0);
+                        break;
+                    }
+                    else
+                    {
+                        shell.execute(data);
+                    }
                 }
             }
-        }
+        */
+        
+
+
+        CFRunLoopRun();
 
         close(shell.clientSd);
     }
@@ -1517,5 +1575,9 @@ int main(int argc, char *argv[])
     {
         cout << "*\n*\n./shell: " << e << endl;
     }
+
+
+
+
     return 0;
 }
