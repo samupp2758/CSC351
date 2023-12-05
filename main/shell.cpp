@@ -439,7 +439,7 @@ json Shell::request_write(json req_json, char *buffer)
 int Shell::request_read(json req_json, char *&res)
 {
     int size = (int)req_json["nBytes"];
-    char req[STD_buffer];
+    char req[STD_buffer_message];
     req_json["user"] = user;
     string req_ = req_json.dump();
     memset(&req, 0, sizeof(req)); // clear the buffer
@@ -447,7 +447,7 @@ int Shell::request_read(json req_json, char *&res)
 
     int sent_bytes = send(clientSd, (char *)&req, strlen(req), 0);
 
-    memset(&req, 0, STD_buffer); // clear the buffer
+    memset(&req, 0, STD_buffer_message); // clear the buffer
 
     int received = recv(clientSd, (char *)&req, size, 0);
 
@@ -996,7 +996,7 @@ void Shell::my_cat()
             file_size = size_res_json["size"];
 
             int position = 0;
-            int buffer_size = 1024;
+            int buffer_size = STD_buffer_message;
             while (position < file_size)
             {
 
@@ -1478,7 +1478,7 @@ int main(int argc, char *argv[])
 {
     string help = "usage ./shell [0, 1 or 2 for the user to be used]\n*\n*";
     ::system("clear");
-    Shell shell = Shell("127.0.0.1", 230, 200*1000,4096);
+    Shell shell = Shell("127.0.0.1", 230, 200*1000,15000);
     char msg[shell.STD_buffer];
     shell.groups = {2, 1, 0}; //[GID_0,GID_1......]
     shell.users = {shell.groups[2], shell.groups[2], shell.groups[1]}; //[GID_user0,GID_user1......]
