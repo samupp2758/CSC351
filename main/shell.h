@@ -72,7 +72,7 @@ using namespace std;
             void my_mkdir();
             void my_rmdir();
             void my_Lcp();
-            void my_Icp();
+            void my_lcp();
             void my_cat();
             void my_cp();
             void my_mv();
