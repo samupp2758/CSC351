@@ -14,9 +14,11 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <fstream>
+#include <thread>
 #include "_tcp_fs.h"
 #define bzero(b, len) (memset((b), '\0', (len)), (void)0)
 using namespace std;
+int STD_buffer = 15000;
 // FS side
 
 /*Function will be called in the main function every time a new message
@@ -27,15 +29,28 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
 {
     FileSystem FS(this->file_name);
     json response;
-    char *res = new char[8192];
+    char *res = new char[STD_buffer];
     if (strcmp(&msg[0], "exit"))
     {
         if (writing)
         {
             response["call"] = "my_write";
-            response["status"] = int(FS.my_Write(file_descriptor[2],
-                                                 file_descriptor[0],
-                                                 file_descriptor[1], msg));
+            
+                for(int i = 0;i<file_descriptor[1];i++){
+                    buff[i+file_descriptor[0]] = msg[i];
+                }
+
+            if(file_descriptor[0]+file_descriptor[1] == file_descriptor[3]){
+                
+                
+                response["status"] = int(FS.my_Write(file_descriptor[2],
+                                                0,
+                                                file_descriptor[3], buff));
+
+                 
+                delete [] buff;
+
+            }
 
             file_descriptor[0] = -1;
             file_descriptor[1] = -1;
@@ -170,10 +185,14 @@ char *FS_CONNECTOR::execute(char *msg, int clientSd)
             else if (request["call"] == "my_write")
             {
                 response["status"] = 0;
-                file_descriptor = new int[3];
+                file_descriptor = new int[4];
                 file_descriptor[0] = request["position"];
                 file_descriptor[1] = request["nBytes"];
                 file_descriptor[2] = request["inodeNumber"];
+                file_descriptor[3] = request["size"];
+                if(request["position"] == 0){
+                    buff = new char[(int)request["size"]];
+                }
                 writing = true;
                 //******************************************************************************
             }
@@ -268,7 +287,7 @@ int main(int argc, char *argv[])
     string help = "usage ./fs filesytem.dat [0 or 1 | open or create]\n*\n*";
     ::system("clear");
     int port = 230;
-    int buff_size = 8192;
+    int buff_size = STD_buffer;
     char msg[buff_size]; // message is 4096 bytes long
     try
     {

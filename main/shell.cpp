@@ -742,6 +742,8 @@ void Shell::my_Lcp()
             //put buffer_piece into destination file
             file.write(buffer_piece, buf_size);
 
+            delete [] buffer_piece;
+
             //move position so you write to the next part
             position += buf_size;
 
@@ -884,7 +886,7 @@ void Shell::my_lcp()
             }
 
             // Reads the buffer piece
-            char *buffer_piece = new char[buf_size];
+            char buffer_piece[buf_size];
             file.seekg(position, ios::beg);
             file.read(buffer_piece, buf_size);
             file.seekg(0, ios::beg);
@@ -1451,7 +1453,7 @@ int main(int argc, char *argv[])
 {
     string help = "usage ./shell [0, 1 or 2 for the user to be used]\n*\n*";
     ::system("clear");
-    Shell shell = Shell("127.0.0.1", 230, 8192);
+    Shell shell = Shell("127.0.0.1", 230, 15000);
     char msg[shell.STD_buffer];
     shell.groups = {2, 1, 0}; //[GID_0,GID_1......]
     shell.users = {shell.groups[2], shell.groups[2], shell.groups[1]}; //[GID_user0,GID_user1......]

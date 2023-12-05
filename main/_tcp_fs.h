@@ -12,6 +12,7 @@ using json = nlohmann::json;
             int*file_descriptor;//POS,SIZE,INODENUMBER
             bool writing;
             bool reading;
+            char*buff;
             int n_of_bytes_reading;
             FS_CONNECTOR(string file);
             ~FS_CONNECTOR();
