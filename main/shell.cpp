@@ -2,9 +2,10 @@
 // Shell side
 //******************************************************************************
 
-Shell::Shell(string serverIp, int port, int buffer)
+Shell::Shell(string serverIp, int port, int buffer,int buffer_minor)
 {
     this->STD_buffer = buffer;
+    this->STD_buffer_message = buffer_minor;
     this->serverIp = &serverIp[0];
     this->port = port;
     this->curDir = "/";
@@ -373,18 +374,23 @@ bool Shell::remove_file(string sourcePath){
 // Request for normal json
 json Shell::request(json req_json)
 {
-    int size = STD_buffer;
+    int size = STD_buffer_message;
 
     char req[size];
     req_json["user"] = user;
     string req_ = req_json.dump();
     memset(&req, 0, size); // clear the buffer
     strcpy(req, req_.c_str());
-    int sent_bytes = send(clientSd, (char *)&req, strlen(req), 0);
+    int sent_bytes = send(clientSd, (char *)&req, req_.length(), 0);
     memset(&req, 0, size); // clear the buffer
     int received_bytes = recv(clientSd, (char *)&req, size, 0);
 
     json res = json::parse((string)req);
+
+    if(res["parsing_status"] == -1){
+        request(req_json);
+    }
+
     if (res["error"] != nullptr)
     {
         throw res["message"];
@@ -399,6 +405,7 @@ json Shell::request(json req_json)
 json Shell::request_write(json req_json, char *buffer)
 {
     int size = int(req_json["nBytes"]);
+    char req_[size];
     char req[size];
     memset(&req, 0, size); // clear the buffer
 
@@ -407,17 +414,23 @@ json Shell::request_write(json req_json, char *buffer)
     int i = 0;
     while (size >= i)
     {
-        req[i] = buffer[i];
+        req_[i] = buffer[i];
         i++;
     }
 
-    int sent = send(clientSd, (char *)&req, size, 0);
+    int sent = send(writeSd, (char *)req_, size, 0);
     memset(&req, 0, size); // clear the buffer
-    int received = recv(clientSd, (char *)&req, STD_buffer, 0);
-
-    json res_write = json::parse((string)req);
-
+    
+    int received;
+    if(req_json["last"] != nullptr && req_json["last"] == 1){
+        received = recv(clientSd, (char *)req, STD_buffer_message, 0);
+    }else{
+        received = recv(writeSd, (char *)req, STD_buffer_message, 0);
+    }
+    
+    json res_write = {{"call","my_write"}};
     return res_write;
+
 }
 
 //******************************************************************************
@@ -717,7 +730,7 @@ void Shell::my_Lcp()
 
         cout << "Transfering file to underlying system...." << endl;
 
-        int buf_size = STD_buffer;
+        int buf_size = STD_buffer_message;
         int position = 0;
         bool successful = false;
         while (1)
@@ -891,21 +904,32 @@ void Shell::my_lcp()
             file.read(buffer_piece, buf_size);
             file.seekg(0, ios::beg);
 
+
+            int last = 0;
+            if(buf_size+position == file_size){
+                last = 1;
+            }
+
             json chunkForm = {{"call", "my_write"},
                               {"position", position},
                               {"nBytes", buf_size},
                               {"size", file_size},
-                              {"inodeNumber", destination_inode_number}};
+                              {"inodeNumber", destination_inode_number},
+                              {"last", last}};
             json res = request_write(chunkForm, buffer_piece);
 
-            if(res["status"] == 0){
-                break;
-            }
+            //if(res == "0"){
+           //     break;
+          //  }
 
             position += buf_size;
 
             // Print the percentage
-            cout << "\r" << (int)(((float)position / (float)file_size) * 100) << "%                   ";
+            if(last == 1){
+                cout<<"Saving file...."<<endl;
+            }else{
+                cout << "\r" << (int)(((float)position / (float)file_size) * 100) << "%                   ";
+            }
 
             if (position >= file_size)
             {
@@ -916,6 +940,7 @@ void Shell::my_lcp()
 
         json size_res_json = request({{"call", "my_Read_Size"}, {"inodeNumber", destination_inode_number}});
         int remote_file_size = size_res_json["size"];
+
 
         if(remote_file_size != file_size){
             remove_file(destination_path);
@@ -1453,7 +1478,7 @@ int main(int argc, char *argv[])
 {
     string help = "usage ./shell [0, 1 or 2 for the user to be used]\n*\n*";
     ::system("clear");
-    Shell shell = Shell("127.0.0.1", 230, 15000);
+    Shell shell = Shell("127.0.0.1", 230, 200*1000,4096);
     char msg[shell.STD_buffer];
     shell.groups = {2, 1, 0}; //[GID_0,GID_1......]
     shell.users = {shell.groups[2], shell.groups[2], shell.groups[1]}; //[GID_user0,GID_user1......]
@@ -1476,10 +1501,29 @@ int main(int argc, char *argv[])
         sendSockAddr.sin_family = AF_INET;
         sendSockAddr.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr *)*host->h_addr_list));
         sendSockAddr.sin_port = htons(shell.port);
+
+        sockaddr_in sendSockAddr_write;
+        bzero((char *)&sendSockAddr_write, sizeof(sendSockAddr_write));
+        sendSockAddr_write.sin_family = AF_INET;
+        sendSockAddr_write.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr *)*host->h_addr_list));
+        sendSockAddr_write.sin_port = htons(shell.port + 1);
+
+
+
+
         shell.clientSd = socket(AF_INET, SOCK_STREAM, 0);
+        shell.writeSd = socket(AF_INET, SOCK_STREAM, 0);
+
+        if (shell.clientSd < 0 ||  shell.writeSd < 0)
+        {
+            cerr << "Error establishing the server socket" << endl;
+            exit(0);
+        }
         // try to connect...
         int status = connect(shell.clientSd, (sockaddr *)&sendSockAddr, sizeof(sendSockAddr));
-        if (status < 0)
+        int status_write = connect(shell.writeSd, (sockaddr *)&sendSockAddr_write, sizeof(sendSockAddr_write));
+        
+        if (status < 0 || status_write < 0)
         {
             cout << "Error connecting to the FS!" << endl;
             return -1;
@@ -1514,6 +1558,7 @@ int main(int argc, char *argv[])
         }
 
         close(shell.clientSd);
+        close(shell.writeSd);
     }
     catch (string e)
     {

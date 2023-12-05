@@ -17,6 +17,6 @@ using json = nlohmann::json;
             FS_CONNECTOR(string file);
             ~FS_CONNECTOR();
 
-            char* execute(char* msg,int clientSd);
+            char* execute(char* msg,int clientSd,int received);
     };
 #endif

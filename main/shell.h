@@ -37,16 +37,18 @@ using namespace std;
     class Shell{
         private:
         public:
-            Shell(string serverIp, int port,int buffer);
+            Shell(string serverIp, int port,int buffer,int buffer_minor);
             ~Shell();
 
             //MAX SHELL BUFFER SIZE
             int STD_buffer;
+            int STD_buffer_message;
 
             //TCP INFO
             char *serverIp;
             int port;
             int clientSd;
+            int writeSd;
 
             json user; //UID AND GID
             string curDir; //current working directory
