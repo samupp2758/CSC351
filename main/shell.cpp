@@ -774,9 +774,9 @@ void Shell::my_Lcp()
 
 //******************************************************************************
 
-void Shell::my_Icp()
+void Shell::my_lcp()
 {
-    string help = "usage: Icp machine/source filesystem/destination";
+    string help = "usage: lcp machine/source filesystem/destination";
     string source_path;
     string destination_path;
     string filename;
@@ -815,7 +815,7 @@ void Shell::my_Icp()
     }
 
     if(testDirectory(destination_path,true)){
-        // Verifies if the user has permission to Icp (just write)
+        // Verifies if the user has permission to lcp (just write)
         testPermissions(destination_path, false, false, true);
     }else{
         testPath(get_parent_path(destination_path));
@@ -1420,8 +1420,8 @@ void Shell::execute(string msg)
             my_rmdir();
         else if (!strcmp(currentCommand[0], "Lcp"))
             my_Lcp();
-        else if (!strcmp(currentCommand[0], "Icp"))
-            my_Icp();
+        else if (!strcmp(currentCommand[0], "lcp"))
+            my_lcp();
         else if (!strcmp(currentCommand[0], "cat"))
             my_cat();
         else if (!strcmp(currentCommand[0], "cp"))
